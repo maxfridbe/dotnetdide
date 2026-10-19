@@ -14,7 +14,15 @@ jobs:
       - run: dotnet restore DotnetDide.slnx --locked-mode
       - run: dotnet test tests/DotnetDide.Core.Tests --no-restore
       - run: dotnet publish src/DotnetDide.Browser -c Release -o artifacts/site --no-restore
-      - run: dotnet test tests/DotnetDide.Browser.Tests --no-restore
+      - name: Test browser runtime
+        shell: bash
+        run: |
+          set -o pipefail
+          if ! dotnet test tests/DotnetDide.Browser.Tests --no-restore 2>&1 | tee browser-tests.log; then
+            # Publish only a validated source-code test identifier, never error payloads or log text.
+            awk '/^  Failed DotnetDide[.]Browser[.]Tests[.]BrowserTests[.][A-Za-z0-9_]+ / { print "::error title=Browser test failed::" $2 }' browser-tests.log
+            exit 1
+          fi
         env:
           CHROME_BIN: /usr/bin/google-chrome
       - uses: actions/upload-artifact@v4
