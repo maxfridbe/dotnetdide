@@ -33,7 +33,11 @@
         <p id="description"></p><p id="expected" class="expected"></p>
         <div id="steps" role="group" aria-label="Example steps"></div>
         <label class="sr-only" for="code">C# submission</label>
+        <div id="code-editor">
+        <div id="monaco" hidden></div>
         <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-describedby="editor-help"></textarea>
+        </div>
+        <p id="editor-state" class="hint" role="status">Loading Monaco… The plain text editor is ready.</p>
         <div class="toolbar"><button id="run" class="primary">▶ Run C#</button><button id="reset" disabled>Reset variables</button><button id="stop" disabled>Stop worker</button></div>
         <p id="editor-help" class="hint">Ctrl/⌘ + Enter to run. Variables persist until reset; files remain until the worker stops.</p>
         <p id="status" role="status" data-state="ready">Ready. First run downloads about 46 MiB of .NET and Roslyn.</p>

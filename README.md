@@ -45,6 +45,14 @@ compiler diagnostics and runtime exceptions. Select an example, edit it and clic
 **Run all checks** verifies every example in a separate workspace without changing
 your interactive session. Expected compiler/runtime errors count as passing checks.
 
+The editor uses Monaco with C# syntax highlighting, line numbers, bracket matching,
+find/replace, undo/redo and Roslyn diagnostics after each run. Ctrl/⌘ + Enter runs
+the current code; Ctrl+M toggles whether Tab indents or moves focus. C# semantic
+IntelliSense and automatic formatting are not provided by this integration.
+Monaco 0.57.0 is bundled as prebuilt browser assets (including its workers), so the
+site has no editor CDN dependency and still needs no Node.js/npm build step.
+If Monaco fails to load, a plain text editor remains available.
+
 The first run downloads approximately 46 MiB of runtime/compiler assets. Files and
 variables are in memory; export a files snapshot before refreshing. You can restore
 files from that snapshot, but variable state is not serialized.

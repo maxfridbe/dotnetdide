@@ -13,3 +13,9 @@ submission chain and System.IO workspace API are implemented in this repository.
 .NET and Roslyn are Microsoft/.NET Foundation projects distributed under their
 respective licenses. NuGet dependency versions and transitive packages are recorded
 in packages.lock.json files.
+
+The testing page bundles Monaco Editor 0.57.0 (Microsoft), licensed under MIT.
+Unmodified prebuilt browser assets and license notices are in
+src/DotnetDide.Browser/wwwroot/vendor/monaco/. See README.txt there for the
+upstream download and verified SHA-512 integrity. Monaco is a playground UI
+dependency, not a dependency of the .NET runspace SDK.

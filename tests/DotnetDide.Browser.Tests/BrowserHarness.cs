@@ -28,7 +28,7 @@ internal sealed class BrowserHarness : IAsyncDisposable
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "global.json"))) directory = directory.Parent;
         Root = directory?.FullName ?? throw new InvalidOperationException("Repository root not found.");
     }
-    public async Task StartAsync()
+    public async Task StartAsync(bool blockMonaco = false)
     {
         var site = Path.Combine(Root, "artifacts/site/wwwroot");
         if (!File.Exists(Path.Combine(site, "dotnetdide.js"))) throw new InvalidOperationException("Publish the browser project to artifacts/site first.");
@@ -54,6 +54,11 @@ internal sealed class BrowserHarness : IAsyncDisposable
         await _socket.ConnectAsync(new Uri(target.GetProperty("webSocketDebuggerUrl").GetString()!), CancellationToken.None);
         await CallAsync("Page.enable", new { });
         await CallAsync("Runtime.enable", new { });
+        if (blockMonaco)
+        {
+            await CallAsync("Network.enable", new { });
+            await CallAsync("Network.setBlockedURLs", new { urls = new[] { "*vendor/monaco/*" } });
+        }
         await CallAsync("Page.navigate", new { url = origin + "/dotnetdide/index.html" });
         for (var i = 0; i < 100; i++)
         {
@@ -92,6 +97,12 @@ internal sealed class BrowserHarness : IAsyncDisposable
             await Task.Delay(50);
         }
         throw new TimeoutException("Browser condition failed: " + expression);
+    }
+    public async Task InsertTextAsync(string text) => await CallAsync("Input.insertText", new { text });
+    public async Task PressKeyAsync(string key, int virtualKey, int modifiers = 0)
+    {
+        await CallAsync("Input.dispatchKeyEvent", new { type = "keyDown", key, windowsVirtualKeyCode = virtualKey, modifiers });
+        await CallAsync("Input.dispatchKeyEvent", new { type = "keyUp", key, windowsVirtualKeyCode = virtualKey, modifiers });
     }
     public async Task SetViewportAsync(int width, int height)
     {

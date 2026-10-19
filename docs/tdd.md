@@ -31,3 +31,14 @@ has no horizontal page overflow, and stopping an infinite loop allows a fresh ru
 Desktop and mobile screenshots are saved as CI artifacts. Together with the original
 runspace acceptance test, the browser suite has two passing tests; the core suite
 continues to pass all 22 tests. No JavaScript package manager is used.
+
+## Monaco playground editor
+
+The updated acceptance test first failed waiting for Monaco on the original
+textarea page. It now passes with the actual locally served Monaco 0.57.0 assets.
+The four browser tests cover C# models, example switching, execution of edited
+code, Roslyn error markers and their removal after edits, phone-width layout,
+selection replacement, undo/redo and Ctrl+Enter via real browser key events.
+Blocking all Monaco asset requests also passes: the plain text editor remains
+editable and its run shortcut executes C# successfully. The published site and
+README screenshot were regenerated; no Node.js or npm build step was added.

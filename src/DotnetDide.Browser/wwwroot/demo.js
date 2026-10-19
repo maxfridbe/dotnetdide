@@ -1,8 +1,13 @@
 import { loadDotnetdide } from './dotnetdide.js';
 import { examples } from './examples.js';
+import { createCodeEditor } from './code-editor.js';
 
 const field = id => document.getElementById(id);
 let runtime, job, selected = examples[0];
+const codeEditor = createCodeEditor({
+  container: field('code-editor'), fallback: field('code'), host: field('monaco'),
+  message: field('editor-state'), run: () => field('run').click(),
+});
 const download = (data, name, type) => {
   const url = URL.createObjectURL(new Blob([data], { type }));
   const link = document.createElement('a'); link.href = url; link.download = name; link.click();
@@ -18,7 +23,7 @@ function buttons() {
   field('stop').disabled = !job && !runtime;
 }
 function loadStep(index) {
-  field('code').value = selected.steps[index];
+  codeEditor.setValue(selected.steps[index]);
   for (const [i, button] of [...field('steps').children].entries()) button.setAttribute('aria-pressed', i === index);
 }
 function selectExample(example) {
@@ -92,18 +97,16 @@ async function action(work, { isolated = false } = {}) {
   }
 }
 field('run').onclick = () => {
-  const code = field('code').value;
+  const code = codeEditor.getValue();
   return action(async active => {
     status('Compiling and running…', 'busy'); const start = performance.now();
     const result = await active.runCSharpAsync(code);
     renderResult(result);
+    codeEditor.setDiagnostics(result.diagnostics, code);
     field('timing').textContent = `${((performance.now() - start) / 1000).toFixed(2)} s · .NET ${active.version}`;
     return result.success ? undefined : 'Submission failed. See the diagnostics below. Ready for another run.';
   });
 };
-field('code').addEventListener('keydown', event => {
-  if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); field('run').click(); }
-});
 field('reset').onclick = () => action(async active => { await active.reset(); return 'Variables reset; workspace files retained. Ready.'; });
 field('stop').onclick = () => {
   const current = job; job = null;
