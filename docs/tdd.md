@@ -62,3 +62,7 @@ Release packaging checks verify ZIP integrity, SHA-256, required assets/document
 and byte equality with the tested runtime DLL. Version selection was checked for
 new-day reset, two-digit leading zeroes, unrelated tags and sequence exhaustion.
 GitHub publishing is gated on the successful test job and uses that run's artifact.
+
+Network policy regression: the real browser test first failed because ordinary
+HttpClient reached the server with the default policy. It now checks default denial,
+helper and HttpClient opt-in, revocation, request counts and retained script state.

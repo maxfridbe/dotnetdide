@@ -1,5 +1,6 @@
 /** Load one isolated .NET 11 runspace. All compilation and file operations run in .NET. */
-export async function loadDotnetdide({ signal, startupTimeoutMs = 120000 } = {}) {
+export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networkAccess = false } = {}) {
+  if (typeof networkAccess !== 'boolean') throw new TypeError('networkAccess must be a boolean.');
   const worker = new Worker(new URL('./dotnetdide.worker.js', import.meta.url), { type: 'module', name: 'dotnetdide' });
   const pending = new Map();
   let sequence = 0;
@@ -36,13 +37,17 @@ export async function loadDotnetdide({ signal, startupTimeoutMs = 120000 } = {})
   }
   const files = (op, values = {}) => request('files', { op, ...values });
   let version;
-  try { version = await request('initialize', null, { signal, timeoutMs: startupTimeoutMs }); }
+  try { version = await request('initialize', { networkAccess }, { signal, timeoutMs: startupTimeoutMs }); }
   catch (error) { terminate(error); throw error; }
   return {
     version,
     runCSharpAsync(code, options) {
       if (typeof code !== 'string') return Promise.reject(new TypeError('code must be a string.'));
       return request('run', code, options);
+    },
+    setNetworkAccess(enabled) {
+      if (typeof enabled !== 'boolean') return Promise.reject(new TypeError('networkAccess must be a boolean.'));
+      return request('network', enabled);
     },
     reset: () => request('reset'),
     terminate,

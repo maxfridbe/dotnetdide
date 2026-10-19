@@ -1,5 +1,7 @@
 import { dotnet } from './_framework/dotnet.js';
 
+import { installNetworkPolicy } from './network-policy.js';
+const setNetworkAccess = installNetworkPolicy();
 let bridge;
 let queue = Promise.resolve();
 async function dispatch({ operation, payload }) {
@@ -11,9 +13,12 @@ async function dispatch({ operation, payload }) {
     const resources = config.resources;
     const assets = [...resources.coreAssembly, ...resources.assembly];
     const urls = assets.map(asset => new URL(asset.resolvedUrl ?? asset.name, new URL('./_framework/', import.meta.url)).href);
-    return await bridge.Initialize(urls);
+    const version = await bridge.Initialize(urls);
+    setNetworkAccess(payload.networkAccess);
+    return version;
   }
   if (!bridge) throw new Error('Runtime is not initialized.');
+  if (operation === 'network') { setNetworkAccess(payload); return; }
   if (operation === 'run') return JSON.parse(await bridge.Run(payload));
   if (operation === 'reset') { bridge.Reset(); return; }
   if (operation === 'files') return JSON.parse(bridge.Files(JSON.stringify(payload)));

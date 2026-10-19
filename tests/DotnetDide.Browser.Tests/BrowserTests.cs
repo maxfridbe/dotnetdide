@@ -3,6 +3,24 @@ namespace DotnetDide.Browser.Tests;
 public sealed class BrowserTests
 {
     [Fact]
+    public async Task NetworkPermissionCoversHelperAndOrdinaryHttpClientWithoutLosingState()
+    {
+        await using var browser = new BrowserHarness(); await browser.StartAsync();
+        await browser.EvaluateAsync("globalThis.net = await api.loadDotnetdide(); globalThis.url = new URL('/network-probe', location.href).href; await net.runCSharpAsync('int kept = 42;');");
+        var blocked = await browser.EvaluateAsync("return await net.runCSharpAsync('await new System.Net.Http.HttpClient().GetStringAsync(' + JSON.stringify(url) + ')');");
+        Assert.False(blocked.GetProperty("success").GetBoolean()); Assert.Equal(0, browser.NetworkRequests);
+        await browser.EvaluateAsync("await net.setNetworkAccess(true);");
+        var helper = await browser.EvaluateAsync("return await net.runCSharpAsync('await Dotnetdide.Net.GetStringAsync(' + JSON.stringify(url) + ')');");
+        Assert.True(helper.GetProperty("success").GetBoolean(), helper.ToString()); Assert.Equal("network-ok", helper.GetProperty("value").GetString());
+        var normal = await browser.EvaluateAsync("return await net.runCSharpAsync('await new System.Net.Http.HttpClient().GetStringAsync(' + JSON.stringify(url) + ')');");
+        Assert.True(normal.GetProperty("success").GetBoolean()); Assert.Equal(2, browser.NetworkRequests);
+        await browser.EvaluateAsync("await net.setNetworkAccess(false);");
+        var revoked = await browser.EvaluateAsync("return await net.runCSharpAsync('await Dotnetdide.Net.GetStringAsync(' + JSON.stringify(url) + ')');");
+        Assert.False(revoked.GetProperty("success").GetBoolean()); Assert.Equal(2, browser.NetworkRequests);
+        Assert.Equal("42", (await browser.EvaluateAsync("return (await net.runCSharpAsync('kept')).value;")).GetString());
+        await browser.EvaluateAsync("net.terminate();");
+    }
+    [Fact]
     public async Task RealDotnet11RunspaceAndFilesystemWorkInsideBrowserWorkers()
     {
         await using var browser = new BrowserHarness(); await browser.StartAsync();

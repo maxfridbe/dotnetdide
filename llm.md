@@ -195,3 +195,31 @@ browser when these features are needed.
 - Await work before returning; unawaited background work outlives output capture.
 - Download/export important files before refreshing. Files are in memory;
   snapshots preserve files, not live C# variables or loaded assemblies.
+
+## Browser network access
+
+Network access defaults to **off**. The host opts in with
+`loadDotnetdide({ networkAccess: true })` and can change it while idle with
+`await runtime.setNetworkAccess(false)` without losing variables or files.
+The setting controls worker `fetch` (including ordinary `HttpClient`), XHR,
+WebSocket, EventSource and WebTransport. Runtime assets load during startup
+before user code runs. Model/API requests made by the embedding page are separate.
+
+```csharp
+var text = await Dotnetdide.Net.GetStringAsync("https://example.org/data.txt");
+var bytes = await Dotnetdide.Net.GetBytesAsync("https://example.org/image.png");
+File.WriteAllBytes("image.png", bytes);
+var reply = await Dotnetdide.Net.PostJsonAsync("https://example.org/api", new { answer = 42 });
+// For custom methods and headers: await Dotnetdide.Net.SendAsync(HttpRequestMessage).
+// Dispose the returned HttpResponseMessage; GetString/GetBytes/PostJson check HTTP status.
+```
+
+Use the exact capitalization `Dotnetdide.Net`. `System.Net.Http` is available
+with an explicit `using` in scripts. Await network I/O; browser CORS and HTTPS
+mixed-content rules still apply. No server proxy, cookie override or CORS bypass
+is provided. Native .NET hosts must supply their own network policy.
+
+This switch is a capability control, **not a hostile-code security sandbox**:
+arbitrary JS interop/dynamic module imports can reach browser APIs outside these
+wrappers. Run trusted code, keep credentials out of runspaces, and enforce network
+isolation at the embedding origin/CSP layer when executing untrusted code.

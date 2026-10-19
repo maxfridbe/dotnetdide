@@ -22,6 +22,7 @@ internal sealed class BrowserHarness : IAsyncDisposable
     private Process? _chrome;
     private int _id;
     public string Root { get; }
+    public int NetworkRequests { get; private set; }
     public BrowserHarness()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -35,6 +36,7 @@ internal sealed class BrowserHarness : IAsyncDisposable
         var builder = WebApplication.CreateBuilder(); builder.Logging.ClearProviders(); builder.WebHost.UseUrls("http://127.0.0.1:0");
         _server = builder.Build();
         _server.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(site), RequestPath = "/dotnetdide", ServeUnknownFileTypes = true });
+        _server.MapGet("/network-probe", () => { NetworkRequests++; return "network-ok"; });
         await _server.StartAsync();
         var origin = _server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
         Directory.CreateDirectory(_profile);
