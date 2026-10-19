@@ -3,6 +3,19 @@ namespace DotnetDide.Browser.Tests;
 public sealed class BrowserTests
 {
     [Fact]
+    public async Task NetworkHelpersSupportBinaryJsonAndCustomRequests()
+    {
+        await using var browser = new BrowserHarness(); await browser.StartAsync();
+        await browser.EvaluateAsync("globalThis.httpRuntime = await api.loadDotnetdide({networkAccess:true}); globalThis.originUrl=location.origin;");
+        var bytes = await browser.EvaluateAsync("return await httpRuntime.runCSharpAsync('System.Text.Encoding.UTF8.GetString(await Dotnetdide.Net.GetBytesAsync(' + JSON.stringify(originUrl + '/network-probe') + '))');");
+        Assert.True(bytes.GetProperty("success").GetBoolean(), bytes.ToString()); Assert.Equal("network-ok", bytes.GetProperty("value").GetString());
+        var json = await browser.EvaluateAsync("return await httpRuntime.runCSharpAsync('await Dotnetdide.Net.PostJsonAsync(' + JSON.stringify(originUrl + '/network-echo') + ', new { answer = 42 })');");
+        Assert.True(json.GetProperty("success").GetBoolean(), json.ToString()); Assert.Equal("{\"answer\":42}", json.GetProperty("value").GetString());
+        var custom = await browser.EvaluateAsync("return await httpRuntime.runCSharpAsync('using System.Net.Http; using (var req = new HttpRequestMessage(HttpMethod.Get, ' + JSON.stringify(originUrl + '/network-probe') + ')) { using (var response = await Dotnetdide.Net.SendAsync(req)) { Console.Write(await response.Content.ReadAsStringAsync()); } }');");
+        Assert.True(custom.GetProperty("success").GetBoolean(), custom.ToString()); Assert.Equal("network-ok", custom.GetProperty("stdout").GetString());
+        await browser.EvaluateAsync("httpRuntime.terminate();");
+    }
+    [Fact]
     public async Task NetworkPermissionCoversHelperAndOrdinaryHttpClientWithoutLosingState()
     {
         await using var browser = new BrowserHarness(); await browser.StartAsync();

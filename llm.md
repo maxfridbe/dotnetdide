@@ -223,3 +223,7 @@ This switch is a capability control, **not a hostile-code security sandbox**:
 arbitrary JS interop/dynamic module imports can reach browser APIs outside these
 wrappers. Run trusted code, keep credentials out of runspaces, and enforce network
 isolation at the embedding origin/CSP layer when executing untrusted code.
+
+For disposable resources in script submissions, use `using (...) { ... }` blocks.
+Top-level `using var` declarations are not accepted by the script parser; regular
+compiled `.cs` programs support them.

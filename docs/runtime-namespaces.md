@@ -5,13 +5,14 @@ Namespaces containing public types or public type forwarders in the published
 matrix. Some types require browser-specific implementations or are unsupported.
 See [llm.md](../llm.md) for imports, examples and execution constraints.
 
-This build exposes **186 namespace names**. Assembly names and namespace
+This build exposes **187 namespace names**. Assembly names and namespace
 names are not interchangeable; a `using` directive imports a namespace, not a DLL.
 
 | Namespace | Assembly metadata |
 | --- | --- |
 | `DotnetDide` | `DotnetDide.Core.dll` |
 | `DotnetDide.Browser` | `DotnetDide.Browser.dll` |
+| `Dotnetdide` | `DotnetDide.Core.dll` |
 | `Internal` | `System.Private.CoreLib.dll` |
 | `Microsoft.CSharp` | `System.dll` |
 | `Microsoft.CSharp.RuntimeBinder` | `Microsoft.CSharp.dll` |

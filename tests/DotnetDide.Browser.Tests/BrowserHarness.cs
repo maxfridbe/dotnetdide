@@ -37,6 +37,9 @@ internal sealed class BrowserHarness : IAsyncDisposable
         _server = builder.Build();
         _server.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(site), RequestPath = "/dotnetdide", ServeUnknownFileTypes = true });
         _server.MapGet("/network-probe", () => { NetworkRequests++; return "network-ok"; });
+        _server.MapPost("/network-echo", async (Microsoft.AspNetCore.Http.HttpRequest request) => {
+            using var reader = new StreamReader(request.Body); return await reader.ReadToEndAsync();
+        });
         await _server.StartAsync();
         var origin = _server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
         Directory.CreateDirectory(_profile);
