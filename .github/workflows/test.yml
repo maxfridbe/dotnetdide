@@ -47,3 +47,53 @@ jobs:
       - name: Deploy testing page
         id: deployment
         uses: actions/deploy-pages@v4
+  release:
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: dotnetdide-releases
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dotnetdide-browser
+          path: artifacts/site/wwwroot
+      - name: Select UTC release version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          day="$(date -u +%y.%m%d)"
+          gh api "repos/$GH_REPO/git/matching-refs/tags/$day." --jq '.[].ref' > existing-tags.txt
+          version="$(bash .github/scripts/next-release-version.sh "$day" < existing-tags.txt)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Package tested browser runtime
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: bash .github/scripts/package-release.sh "$RELEASE_VERSION"
+      - name: Publish versioned ZIP and checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          cat > release-notes.md <<'NOTES'
+          Tested .NET 11 browser runspace and Monaco playground, ready for static hosting or embedding.
+
+          Download the versioned ZIP and verify its SHA-256 checksum. Extract it and serve `wwwroot/` over HTTPS or localhost. The archive includes the runtime, editor assets, examples, `integration.md`, `llm.md`, library inventories and license notices.
+
+          Workspace programs support `Dotnet.Build()` and `await Dotnet.Run("file.cs")` or a supported `.csproj`. Builds produce managed DLL/PDB artifacts. See `llm.md` for the supported project subset and browser limitations.
+          NOTES
+          gh release create "$RELEASE_VERSION" \
+            --target "$RELEASE_COMMIT" \
+            --title "dotnetdide $RELEASE_VERSION" \
+            --notes-file release-notes.md \
+            "artifacts/releases/dotnetdide-$RELEASE_VERSION.zip" \
+            "artifacts/releases/dotnetdide-$RELEASE_VERSION.zip.sha256"

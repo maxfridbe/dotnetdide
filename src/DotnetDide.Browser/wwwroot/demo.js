@@ -46,6 +46,7 @@ for (const example of examples) {
   field('examples').append(button);
 }
 selectExample(selected);
+field('check-summary').textContent = `${examples.length} examples · real .NET execution`;
 
 function renderResult(result) {
   field('output').textContent = JSON.stringify(result, null, 2);

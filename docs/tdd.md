@@ -42,3 +42,23 @@ selection replacement, undo/redo and Ctrl+Enter via real browser key events.
 Blocking all Monaco asset requests also passes: the plain text editor remains
 editable and its run shortcut executes C# successfully. The published site and
 README screenshot were regenerated; no Node.js or npm build step was added.
+
+## Workspace programs and versioned distribution
+
+Eleven new tests first failed because `Dotnet` was not defined. The globals helper
+now compiles `.cs` files, discovers source directories and reads a strict subset of
+SDK-style `.csproj` files. Tests cover DLL/portable-PDB output without execution,
+async entry points and arguments, source locations in diagnostics, rebuilds,
+runtime exceptions, project-relative files, compile globs and library output,
+unsupported project features, default imports and warning policy.
+
+All 35 core tests and five real browser tests pass. Browser coverage includes both
+new playground examples, explicit async Main executing without a blocking wrapper,
+DLL/PDB signatures, compile failures and the published LLM/namespace documents.
+The namespace inventory is derived from public type definitions/forwarders in the
+published runtime DLL metadata.
+
+Release packaging checks verify ZIP integrity, SHA-256, required assets/documents
+and byte equality with the tested runtime DLL. Version selection was checked for
+new-day reset, two-digit leading zeroes, unrelated tags and sequence exhaustion.
+GitHub publishing is gated on the successful test job and uses that run's artifact.

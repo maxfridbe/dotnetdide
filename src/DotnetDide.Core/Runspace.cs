@@ -13,6 +13,7 @@ public sealed class Runspace : IDisposable
     private readonly MetadataReference[] _references;
     private readonly Dictionary<string, Assembly> _assemblies = new(StringComparer.Ordinal);
     private readonly string _id = Guid.NewGuid().ToString("N");
+    private readonly RunspaceGlobals _globals;
     private CSharpCompilation? _previous;
     private object[] _states = new object[16];
     private int _sequence, _submissions, _pending;
@@ -22,6 +23,8 @@ public sealed class Runspace : IDisposable
     public Runspace(WorkspaceFileSystem files, IEnumerable<MetadataReference> references)
     {
         Files = files; _references = references.ToArray();
+        _globals = new(new DotnetCommands(Files, _references, assembly => _assemblies[assembly.GetName().Name!] = assembly));
+        _states[0] = _globals;
         AppDomain.CurrentDomain.AssemblyResolve += ResolveAssembly;
     }
     private Assembly? ResolveAssembly(object? sender, ResolveEventArgs args) =>
@@ -40,9 +43,9 @@ public sealed class Runspace : IDisposable
                 path: "submission.csx", cancellationToken: cancellationToken);
             var name = $"DotnetDide_{_id}_{++_sequence}";
             var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
-                usings: ["System", "System.IO", "System.Linq", "System.Collections.Generic", "System.Threading.Tasks"],
+                usings: ProjectReader.ScriptUsings,
                 scriptClassName: "Submission", optimizationLevel: OptimizationLevel.Release);
-            var compilation = CSharpCompilation.CreateScriptCompilation(name, tree, _references, options, _previous, typeof(object));
+            var compilation = CSharpCompilation.CreateScriptCompilation(name, tree, _references, options, _previous, typeof(object), globalsType: typeof(RunspaceGlobals));
             using var stream = new MemoryStream();
             var emitted = compilation.Emit(stream, cancellationToken: cancellationToken);
             var diagnostics = emitted.Diagnostics.Select(d =>
@@ -77,7 +80,7 @@ public sealed class Runspace : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (Volatile.Read(ref _pending) != 0) throw new InvalidOperationException("Cannot reset a busy runspace.");
-        _previous = null; _states = new object[16]; _submissions = 0;
+        _previous = null; _states = new object[16]; _states[0] = _globals; _submissions = 0;
         // Loaded assemblies cannot be unloaded in browser-wasm. Terminate the worker to reclaim them.
     }
     public void Dispose()
@@ -87,7 +90,7 @@ public sealed class Runspace : IDisposable
         _disposed = true; AppDomain.CurrentDomain.AssemblyResolve -= ResolveAssembly;
         _assemblies.Clear(); _states = []; _previous = null;
     }
-    private sealed class BoundedWriter : StringWriter
+    internal sealed class BoundedWriter : StringWriter
     {
         private const int Limit = 1_000_000;
         private bool _truncated;

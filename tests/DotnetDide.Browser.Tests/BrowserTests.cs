@@ -42,13 +42,13 @@ public sealed class BrowserTests
         await browser.WaitForAsync("document.querySelector('#code-editor')?.dataset.editor === 'monaco'");
         Assert.Equal("csharp", (await browser.EvaluateAsync("return monaco.editor.getModels()[0].getLanguageId();")).GetString());
         Assert.True((await browser.EvaluateAsync("return document.querySelector('#code').hidden && !!document.querySelector('#monaco .view-lines');")).GetBoolean());
-        Assert.Equal(8, (await browser.EvaluateAsync("return document.querySelectorAll('#examples button').length;")).GetInt32());
+        Assert.Equal(10, (await browser.EvaluateAsync("return document.querySelectorAll('#examples button').length;")).GetInt32());
         await browser.EvaluateAsync("document.querySelector('#run').click();");
         await browser.WaitForAsync("!document.querySelector('#run').disabled && !!document.querySelector('#files button')");
         await browser.EvaluateAsync("document.querySelector('#check').click();");
         await browser.WaitForAsync("!document.querySelector('#check').disabled");
-        Assert.True((await browser.EvaluateAsync("return document.querySelector('#check-summary').textContent === '8/8 checks passed';")).GetBoolean(), (await browser.EvaluateAsync("return document.querySelector('#checks').textContent + document.querySelector('#status').textContent;")).GetString());
-        Assert.Equal(8, (await browser.EvaluateAsync("return document.querySelectorAll('#checks [data-state=pass]').length;")).GetInt32());
+        Assert.True((await browser.EvaluateAsync("return document.querySelector('#check-summary').textContent === '10/10 checks passed';")).GetBoolean(), (await browser.EvaluateAsync("return document.querySelector('#checks').textContent + document.querySelector('#status').textContent;")).GetString());
+        Assert.Equal(10, (await browser.EvaluateAsync("return document.querySelectorAll('#checks [data-state=pass]').length;")).GetInt32());
         Assert.Contains("outputs/answer.txt", (await browser.EvaluateAsync("return document.querySelector('#files').textContent;")).GetString());
         await browser.EvaluateAsync("monaco.editor.getModels()[0].setValue('answer + 3'); document.querySelector('#run').click();");
         await browser.WaitForAsync("!document.querySelector('#run').disabled");
@@ -107,5 +107,21 @@ public sealed class BrowserTests
         await browser.WaitForAsync("!document.querySelector('#run').disabled && document.querySelector('#result').textContent.includes('56')");
         Assert.Equal("56", (await browser.EvaluateAsync("return JSON.parse(document.querySelector('#output').textContent).value;")).GetString());
         await browser.EvaluateAsync("document.querySelector('#stop').click();");
+    }
+    [Fact]
+    public async Task WorkspaceProgramsBuildAndAsyncMainRunsInsideWasm()
+    {
+        await using var browser = new BrowserHarness(); await browser.StartAsync();
+        var result = await browser.EvaluateAsync("globalThis.programRuntime = await api.loadDotnetdide(); await programRuntime.FS.writeFile('Program.cs', 'class Program { static async Task<int> Main(string[] args) { await Task.Delay(1); Console.Write(args[0]); return 3; } }'); return await programRuntime.runCSharpAsync('var program = await Dotnet.Run(\"Program.cs\", new[] { \"wasm\" }); program.ExitCode');");
+        Assert.True(result.GetProperty("success").GetBoolean()); Assert.Equal("3", result.GetProperty("value").GetString());
+        Assert.Contains("Build succeeded", result.GetProperty("stdout").GetString()); Assert.Contains("wasm", result.GetProperty("stdout").GetString());
+        Assert.Equal("[77,90]", (await browser.EvaluateAsync("return [...(await programRuntime.FS.readFile('bin/Program.dll')).slice(0,2)];")).GetRawText());
+        Assert.Equal("[66,83,74,66]", (await browser.EvaluateAsync("return [...(await programRuntime.FS.readFile('bin/Program.pdb')).slice(0,4)];")).GetRawText());
+        var failed = await browser.EvaluateAsync("await programRuntime.FS.writeFile('Program.cs', 'missingName();'); return await programRuntime.runCSharpAsync('var failed = await Dotnet.Run(\"Program.cs\"); failed.Success');");
+        Assert.True(failed.GetProperty("success").GetBoolean()); Assert.Equal("False", failed.GetProperty("value").GetString());
+        Assert.Contains("Program.cs(1,1)", failed.GetProperty("stdout").GetString()); Assert.Contains("CS0103", failed.GetProperty("stdout").GetString());
+        await browser.EvaluateAsync("programRuntime.terminate();");
+        Assert.True((await browser.EvaluateAsync("const guide=await fetch('llm.md'); return guide.ok && (await guide.text()).includes('using System.Threading.Tasks;');")).GetBoolean());
+        Assert.True((await browser.EvaluateAsync("const inventory=await fetch('docs/runtime-namespaces.md'); return inventory.ok && (await inventory.text()).includes('System.Text.Json');")).GetBoolean());
     }
 }

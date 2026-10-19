@@ -86,4 +86,45 @@ archiveText`],
     steps: ['Console.Error.WriteLine("Before the exception");\nthrow new InvalidOperationException("Intentional demo error");'], expectsFailure: true,
     verify: async results => !results[0].success && results[0].error?.message === 'Intentional demo error' && results[0].stderr.includes('Before the exception'),
   },
+  {
+    id: 'build-file', title: 'Compile and run a C# file', category: 'DOTNET.BUILD / RUN',
+    description: 'Save a complete C# program, compile downloadable DLL/PDB files, then run its async entry point with arguments.',
+    expected: 'Prints Hello, browser! and returns True. Download hello.dll and hello.pdb below.',
+    steps: [`File.WriteAllText("hello.cs", """
+await Task.Delay(10);
+Console.WriteLine($"Hello, {args[0]}!");
+return 0;
+""");
+var build = Dotnet.Build("hello.cs");
+var program = await Dotnet.Run("hello.cs", new[] { "browser" });
+program.Success`],
+    verify: async (results, runtime) => results[0].value === 'True' && results[0].stdout.includes('Hello, browser!') &&
+      (await runtime.FS.readFile('bin/hello.dll')).length > 0 && (await runtime.FS.readFile('bin/hello.pdb')).length > 0,
+  },
+  {
+    id: 'build-project', title: 'Build a multi-file project', category: 'CSPROJ',
+    description: 'Create an SDK-style project. Dotnet.Build() discovers it in the working directory; Dotnet.Run executes the program.',
+    expected: 'Prints 42, returns True and creates app/result.txt plus app/bin/Demo.dll and its symbols.',
+    steps: [`Directory.CreateDirectory("app");
+File.WriteAllText("app/Demo.csproj", """
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+</Project>
+""");
+File.WriteAllText("app/Helper.cs", "public static class Helper { public static int Value => 42; }");
+File.WriteAllText("app/Program.cs", """
+Console.WriteLine(Helper.Value);
+File.WriteAllText("result.txt", Helper.Value.ToString());
+""");
+Directory.SetCurrentDirectory("app");
+var build = Dotnet.Build();
+var program = await Dotnet.Run("Demo.csproj");
+program.Success`],
+    verify: async (results, runtime) => results[0].value === 'True' && results[0].stdout.includes('Build succeeded') &&
+      await runtime.FS.readFile('app/result.txt', { encoding: 'utf8' }) === '42' && (await runtime.FS.readFile('app/bin/Demo.dll')).length > 0,
+  },
 ];

@@ -22,6 +22,27 @@ loads the runtime, carries worker messages and presents the small demo.
 - Export/import JSON workspace snapshots for host-managed persistence.
 - Isolate each runspace in its own worker. Terminate a worker even during an infinite loop.
 - Reset variables while retaining files, or start a fresh worker for a full reset.
+- Build workspace C# files and supported SDK-style projects into downloadable DLL/PDB files.
+- Run compiled programs with arguments, async entry points, build logs and captured output.
+
+## Build and run saved C# programs
+
+Inside a submission, use the supplied `Dotnet` helper:
+
+```csharp
+File.WriteAllText("hello.cs", "Console.WriteLine(args[0]);");
+var build = Dotnet.Build("hello.cs"); // DLL + portable PDB, without executing
+var run = await Dotnet.Run("hello.cs", new[] { "Hello from a saved program" });
+Console.WriteLine(run.ExitCode);
+```
+
+`Dotnet.Build()` discovers the project in the current directory, or compiles its
+C# files when there is no project. `await Dotnet.Run("app/Demo.csproj")` compiles
+and runs a supported SDK-style project. Logs and diagnostics appear in the output;
+generated files appear in the download list. Inspect `build.Success`/`run.Success`.
+This uses Roslyn and a documented project subset; it does not run MSBuild or restore
+NuGet packages. See **[llm.md](llm.md)** for default imports, available namespaces,
+result fields, project support and guidance for generating programs.
 
 ## Available .NET libraries
 
@@ -40,7 +61,8 @@ Additional NuGet packages cannot currently be installed at runtime.
 
 The [GitHub Pages testing page](https://maxfridbe.github.io/dotnetdide/) includes
 examples for persistent variables, LINQ, JSON, System.IO, ZIP archives, async code,
-compiler diagnostics and runtime exceptions. Select an example, edit it and click
+compiler diagnostics, runtime exceptions and file/project compilation with `Dotnet.Build`
+and `await Dotnet.Run`. Select an example, edit it and click
 **Run C#** (or Ctrl/⌘ + Enter). The variables example has two steps to run in order.
 **Run all checks** verifies every example in a separate workspace without changing
 your interactive session. Expected compiler/runtime errors count as passing checks.
@@ -84,6 +106,25 @@ only a local static-file development server.
 Browser tests launch an installed Chrome/Chromium and speak DevTools Protocol
 using .NET `ClientWebSocket`. They fail if the browser or published files are
 missing; they never silently substitute a mock runtime.
+
+## Versioned ZIP releases
+
+[Download browser/embedding releases](https://github.com/maxfridbe/dotnetdide/releases).
+Successful `master` workflows publish `dotnetdide-yy.mmdd.nn.zip` and a SHA-256
+checksum, using the UTC date and a two-digit daily sequence starting at `01`
+(for example `26.1019.01`, then `26.1019.02`). Release jobs serialize version
+allocation and tag the exact tested commit. Pull requests do not publish releases.
+
+The ZIP contains `wwwroot/` with the complete tested runtime/playground, plus
+README, integration/LLM guides, namespace/assembly inventories, license notices
+and `release.json` with the version and commit. Extract it and serve `wwwroot/`
+over HTTPS or localhost; no build tools are needed to use the published archive.
+
+To package a local published build without uploading anything:
+
+```sh
+bash .github/scripts/package-release.sh 26.1019.01
+```
 
 ## Embed
 

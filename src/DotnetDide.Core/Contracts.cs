@@ -1,6 +1,6 @@
 namespace DotnetDide;
 
-public sealed record CodeDiagnostic(string Id, string Message, string Severity, int Line, int Column);
+public sealed record CodeDiagnostic(string Id, string Message, string Severity, int Line, int Column, string? FilePath = null);
 public sealed record RunError(string Type, string Message);
 public sealed record RunResult(bool Success, string Stdout, string Stderr, string? Value,
     IReadOnlyList<CodeDiagnostic> Diagnostics, RunError? Error);

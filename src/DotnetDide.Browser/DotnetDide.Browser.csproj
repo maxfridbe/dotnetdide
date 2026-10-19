@@ -6,4 +6,9 @@
   <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
 </PropertyGroup>
 <ItemGroup><ProjectReference Include="../DotnetDide.Core/DotnetDide.Core.csproj" /></ItemGroup>
+<ItemGroup>
+  <Content Include="../../llm.md" Link="wwwroot/llm.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  <Content Include="../../docs/runtime-namespaces.md" Link="wwwroot/docs/runtime-namespaces.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  <Content Include="../../docs/runtime-assemblies.md" Link="wwwroot/docs/runtime-assemblies.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+</ItemGroup>
 </Project>

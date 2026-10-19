@@ -34,6 +34,8 @@ public sealed class WorkspaceFileSystem
         return full;
     }
 
+    internal string ResolvePath(string path, bool allowRoot = false) => Resolve(path, allowRoot);
+
     private static void RejectLink(string path)
     {
         if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)

@@ -96,3 +96,38 @@ from native callers; the browser worker enforces this queue automatically.
 
 The .NET cancellation token supports waiting/compilation cancellation; it cannot
 interrupt arbitrary running IL. Browser termination is the hard-stop mechanism.
+
+## Workspace compilation from C#
+
+The C# submission globals expose `Dotnet`. From JavaScript, use the normal ordered
+submission API; no extra worker or host process is needed:
+
+```js
+await runtime.FS.writeFile('hello.cs', 'Console.WriteLine(args[0]);');
+const submission = await runtime.runCSharpAsync(`
+    var build = Dotnet.Build("hello.cs");
+    var run = await Dotnet.Run("hello.cs", new[] { "browser" });
+    run.Success
+`);
+console.log(submission.stdout); // build logs and program output
+console.log(submission.value);  // "True" when the program exits successfully
+const dll = await runtime.FS.readFile('bin/hello.dll');
+const symbols = await runtime.FS.readFile('bin/hello.pdb');
+```
+
+`Run` returns a task and must be awaited. It rebuilds each time and runs the source
+entry point directly, including async Main, without blocking the browser thread.
+`Build` is synchronous and writes artifacts without executing them. `Run` returns
+a program result with `Success`, `Build`, `Stdout`, `Stderr`, `ExitCode` and `Error`.
+A nonzero exit or compiler/runtime failure makes that result unsuccessful; the
+containing script can still succeed. Inspect the inner result. Build diagnostics
+also expose `FilePath` alongside one-based line/column and compiler ID.
+
+No-path calls discover a single project in the current directory, or compile the
+directory's C# files if no project exists. Explicit `.cs` paths build that file
+alone; explicit `.csproj` paths use the supported project subset. Executables
+run in their source/project directory and restore the caller's directory and
+console afterward. Ordinary compiled programs do not share interactive variables
+or imports. See [llm.md](llm.md) for the exact imports, project properties/items,
+artifacts, default behavior and browser limitations. The published site includes
+`llm.md` and both runtime inventories for embedding hosts and code-generating agents.
