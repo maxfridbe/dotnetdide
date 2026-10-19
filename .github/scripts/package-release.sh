@@ -9,7 +9,7 @@ if [[ ! "$version" =~ ^[0-9]{2}\.[0-9]{4}\.[0-9]{2}$ ]]; then
 fi
 repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
-for file in artifacts/site/wwwroot/index.html artifacts/site/wwwroot/dotnetdide.js artifacts/site/wwwroot/_framework/dotnet.js artifacts/site/wwwroot/llm.md; do
+for file in artifacts/site/wwwroot/index.html artifacts/site/wwwroot/dotnetdide.js artifacts/site/wwwroot/_framework/dotnet.js artifacts/site/wwwroot/llm.md artifacts/relay/DotnetDide.Relay.dll; do
   test -f "$file" || { echo "Missing published file: $file. Publish the browser project first." >&2; exit 1; }
 done
 mkdir -p "$output"
@@ -22,6 +22,7 @@ fi
 staging="$(mktemp -d)"
 trap 'rm -rf -- "$staging"' EXIT
 cp -R artifacts/site/wwwroot "$staging/wwwroot"
+cp -R artifacts/relay "$staging/relay"
 cp README.md integration.md llm.md LICENSE NOTICE "$staging/"
 cp -R docs "$staging/docs"
 commit="$(git rev-parse HEAD)"

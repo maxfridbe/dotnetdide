@@ -1,7 +1,10 @@
+import { relayFetch, validateRelay } from './relay-fetch.js';
+
 // Install before .NET captures fetch. This is a capability control for cooperative
 // C# code, not an isolation boundary for hostile JS interop or dynamically imported code.
 export function installNetworkPolicy(scope = globalThis) {
   let allowed = true; // Runtime bootstrap must load its own assemblies before user code exists.
+  let relay = null;
   const sockets = new Set();
   const denied = () => new DOMException('Network access is disabled by the host.', 'NotAllowedError');
   const originalFetch = scope.fetch.bind(scope);
@@ -9,7 +12,7 @@ export function installNetworkPolicy(scope = globalThis) {
     value: async (input, init = {}) => {
       if (!allowed) throw denied();
       // Preserve fetch's signal through body consumption, not only until headers arrive.
-      return originalFetch(input, init);
+      return relay ? relayFetch(originalFetch, relay, input, init) : originalFetch(input, init);
     } });
   for (const name of ['WebSocket', 'EventSource', 'WebTransport', 'XMLHttpRequest']) {
     const Original = scope[name];
@@ -17,21 +20,23 @@ export function installNetworkPolicy(scope = globalThis) {
     Object.defineProperty(scope, name, { configurable: false, writable: false,
       value: new Proxy(Original, { construct(target, args) {
         if (!allowed) throw denied();
+        if (relay) throw new DOMException('The HTTP relay does not support sockets or XMLHttpRequest. Use HttpClient/fetch.', 'NotSupportedError');
         const socket = Reflect.construct(target, args);
         sockets.add(socket);
         if (name === 'XMLHttpRequest') {
           const send = socket.send.bind(socket);
-          socket.send = (...values) => { if (!allowed) throw denied(); return send(...values); };
+          socket.send = (...values) => { if (!allowed) throw denied(); if (relay) throw new DOMException('Use HTTP fetch with the relay.', 'NotSupportedError'); return send(...values); };
         }
         socket.addEventListener?.('close', () => sockets.delete(socket), { once: true });
         socket.addEventListener?.('loadend', () => sockets.delete(socket), { once: true });
         return socket;
       } }) });
   }
-  return enabled => {
+  return (enabled, configuration) => {
     if (typeof enabled !== 'boolean') throw new TypeError('networkAccess must be a boolean.');
+    if (configuration !== undefined) relay = validateRelay(configuration);
     allowed = enabled;
-    if (!allowed) {
+    if (!allowed || relay) {
       for (const socket of sockets) { socket.close?.(); socket.abort?.(); }
       sockets.clear();
     }

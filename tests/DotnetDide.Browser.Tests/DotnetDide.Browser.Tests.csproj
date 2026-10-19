@@ -3,4 +3,5 @@
 <PackageReference Include="xunit" Version="2.9.3" />
 <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
 <FrameworkReference Include="Microsoft.AspNetCore.App" /><Using Include="Xunit" />
+<ProjectReference Include="../../tools/DotnetDide.Relay/DotnetDide.Relay.csproj" />
 </ItemGroup></Project>

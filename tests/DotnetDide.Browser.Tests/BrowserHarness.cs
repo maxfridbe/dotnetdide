@@ -41,6 +41,12 @@ internal sealed class BrowserHarness : IAsyncDisposable
         _server.MapPost("/network-echo", async (Microsoft.AspNetCore.Http.HttpRequest request) => {
             using var reader = new StreamReader(request.Body); return await reader.ReadToEndAsync();
         });
+        _server.MapMethods("/network-method", ["GET", "HEAD", "OPTIONS", "DELETE", "POST", "PUT", "PATCH"], async (HttpContext context) => {
+            context.Response.Headers["X-Method"] = context.Request.Method;
+            context.Response.Headers["X-Test"] = context.Request.Headers["X-Test"];
+            context.Response.StatusCode = context.Request.Method == "DELETE" ? 409 : 200;
+            await context.Request.Body.CopyToAsync(context.Response.Body);
+        });
         _server.MapGet("/network-slow", async (HttpContext context) => {
             context.Response.ContentType = "text/plain";
             await context.Response.StartAsync();

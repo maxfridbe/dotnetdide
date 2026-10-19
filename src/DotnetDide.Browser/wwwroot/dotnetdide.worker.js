@@ -14,7 +14,7 @@ async function dispatch({ operation, payload }) {
     const assets = [...resources.coreAssembly, ...resources.assembly];
     const urls = assets.map(asset => new URL(asset.resolvedUrl ?? asset.name, new URL('./_framework/', import.meta.url)).href);
     const version = await bridge.Initialize(urls);
-    setNetworkAccess(payload.networkAccess);
+    setNetworkAccess(payload.networkAccess, payload.relay);
     return version;
   }
   if (!bridge) throw new Error('Runtime is not initialized.');

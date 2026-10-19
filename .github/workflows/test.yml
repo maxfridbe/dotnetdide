@@ -14,13 +14,14 @@ jobs:
       - run: dotnet restore DotnetDide.slnx --locked-mode
       - run: dotnet test tests/DotnetDide.Core.Tests --no-restore
       - run: dotnet publish src/DotnetDide.Browser -c Release -o artifacts/site --no-restore
+      - run: dotnet publish tools/DotnetDide.Relay -c Release -o artifacts/relay --no-restore
       - name: Test browser runtime
         shell: bash
         run: |
           set -o pipefail
           if ! dotnet test tests/DotnetDide.Browser.Tests --no-restore 2>&1 | tee browser-tests.log; then
             # Publish only a validated source-code test identifier, never error payloads or log text.
-            awk '/^  Failed DotnetDide[.]Browser[.]Tests[.]BrowserTests[.][A-Za-z0-9_]+ / { print "::error title=Browser test failed::" $2 }' browser-tests.log
+            awk '/^  Failed DotnetDide[.]Browser[.]Tests[.][A-Za-z0-9_]+[.][A-Za-z0-9_]+ / { print "::error title=Browser test failed::" $2 }' browser-tests.log
             exit 1
           fi
         env:
@@ -29,6 +30,10 @@ jobs:
         with:
           name: dotnetdide-browser
           path: artifacts/site/wwwroot
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dotnetdide-relay
+          path: artifacts/relay
       - uses: actions/upload-pages-artifact@v4
         if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
         with:
@@ -70,6 +75,10 @@ jobs:
         with:
           name: dotnetdide-browser
           path: artifacts/site/wwwroot
+      - uses: actions/download-artifact@v4
+        with:
+          name: dotnetdide-relay
+          path: artifacts/relay
       - name: Select UTC release version
         id: version
         env:
@@ -95,7 +104,9 @@ jobs:
           cat > release-notes.md <<'NOTES'
           Tested .NET 11 browser runspace and Monaco playground, ready for static hosting or embedding.
 
-          Download the versioned ZIP and verify its SHA-256 checksum. Extract it and serve `wwwroot/` over HTTPS or localhost. The archive includes the runtime, editor assets, examples, `integration.md`, `llm.md`, library inventories and license notices.
+          Download the versioned ZIP and verify its SHA-256 checksum. Extract it and serve `wwwroot/` over HTTPS or localhost. The archive includes the runtime, editor assets, examples, the optional native .NET HTTP/SOCKS5 relay in `relay/`, `integration.md`, `llm.md`, library inventories and license notices.
+
+          See `docs/networking.md` to configure the relay with allowed origins/targets and an optional upstream SOCKS5 proxy or Tor client. The bridge distribution website is not a proxy.
 
           Workspace programs support `Dotnet.Build()` and `await Dotnet.Run("file.cs")` or a supported `.csproj`. Builds produce managed DLL/PDB artifacts. See `llm.md` for the supported project subset and browser limitations.
           NOTES

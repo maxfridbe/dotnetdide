@@ -62,8 +62,8 @@ For all namespace names present in the pinned runtime metadata, see the
 [namespace inventory](docs/runtime-namespaces.md). The separate
 [assembly inventory](docs/runtime-assemblies.md) lists DLLs. Namespace availability
 does not guarantee that every type or method works in a browser: OS-dependent APIs
-can throw `PlatformNotSupportedException`. Network requests require the remote
-server to allow browser requests (CORS). Native processes, arbitrary OS networking,
+can throw `PlatformNotSupportedException`. Direct network requests require the remote
+server to allow browser requests (CORS); an optional host relay can forward HTTP. Native processes, arbitrary OS networking,
 registry access and native filesystem watchers are unavailable. There is no
 runtime NuGet installer, ASP.NET server host, or desktop UI framework.
 
@@ -211,14 +211,23 @@ var text = await Dotnetdide.Net.GetStringAsync("https://example.org/data.txt");
 var bytes = await Dotnetdide.Net.GetBytesAsync("https://example.org/image.png");
 File.WriteAllBytes("image.png", bytes);
 var reply = await Dotnetdide.Net.PostJsonAsync("https://example.org/api", new { answer = 42 });
-// For custom methods and headers: await Dotnetdide.Net.SendAsync(HttpRequestMessage).
+// More methods: HeadAsync, OptionsAsync, DeleteAsync, PostAsync, PutAsync, PatchAsync,
+// PostFormAsync and RequestAsync(method, url, content, options).
+// Custom headers/fetch settings: SendAsync(request, new Dotnetdide.BrowserRequestOptions { Credentials = "omit" }).
+// Async stream: OpenReadAsync(url). Save directly: DownloadFileAsync(url, "result.csv").
 // Dispose the returned HttpResponseMessage; GetString/GetBytes/PostJson check HTTP status.
 ```
 
 Use the exact capitalization `Dotnetdide.Net`. `System.Net.Http` is available
-with an explicit `using` in scripts. Await network I/O; browser CORS and HTTPS
-mixed-content rules still apply. No server proxy, cookie override or CORS bypass
-is provided. Native .NET hosts must supply their own network policy.
+with an explicit `using` in scripts. Await network I/O. Direct HTTP obeys destination CORS and browser
+mixed-content rules. The host can configure `relay: { endpoint, token }` for an
+optional native .NET HTTP relay with SOCKS5 support; ordinary `HttpClient` uses it
+too. The relay is included in release ZIPs under `relay/`. See
+[HTTP methods, browser options, relay and Tor setup](docs/networking.md).
+`bridges.torproject.org` supplies Tor bridge addresses; it is not a proxy endpoint.
+Raw `System.Net.Sockets` and `HttpClientHandler.Proxy` remain unsupported in WASM;
+`Net.OpenReadAsync` exposes HTTP as an async `System.IO.Stream`.
+Native .NET runspace hosts must supply their own network policy.
 
 This switch is a capability control, **not a hostile-code security sandbox**:
 arbitrary JS interop/dynamic module imports can reach browser APIs outside these

@@ -1,6 +1,9 @@
+import { validateRelay } from './relay-fetch.js';
+
 /** Load one isolated .NET 11 runspace. All compilation and file operations run in .NET. */
-export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networkAccess = false } = {}) {
+export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networkAccess = false, relay = null } = {}) {
   if (typeof networkAccess !== 'boolean') throw new TypeError('networkAccess must be a boolean.');
+  relay = validateRelay(relay);
   const worker = new Worker(new URL('./dotnetdide.worker.js', import.meta.url), { type: 'module', name: 'dotnetdide' });
   const pending = new Map();
   let sequence = 0;
@@ -37,7 +40,7 @@ export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networ
   }
   const files = (op, values = {}) => request('files', { op, ...values });
   let version;
-  try { version = await request('initialize', { networkAccess }, { signal, timeoutMs: startupTimeoutMs }); }
+  try { version = await request('initialize', { networkAccess, relay }, { signal, timeoutMs: startupTimeoutMs }); }
   catch (error) { terminate(error); throw error; }
   return {
     version,
