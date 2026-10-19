@@ -1,0 +1,23 @@
+name: .NET and browser runspace
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 11.0.100-rc.2.26504.105
+      - run: dotnet workload install wasm-tools
+      - run: dotnet restore DotnetDide.slnx --locked-mode
+      - run: dotnet test tests/DotnetDide.Core.Tests --no-restore
+      - run: dotnet publish src/DotnetDide.Browser -c Release -o artifacts/site --no-restore
+      - run: dotnet test tests/DotnetDide.Browser.Tests --no-restore
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dotnetdide-browser
+          path: artifacts/site/wwwroot

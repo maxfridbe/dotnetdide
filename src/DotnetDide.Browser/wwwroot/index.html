@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>dotnetdide · .NET 11 runspace</title><link rel="stylesheet" href="demo.css"></head>
+<body><main><header><p class="eyebrow">C# · WEBASSEMBLY · LOCAL EXECUTION</p><h1>dotnetdide</h1>
+<p>A .NET 11 runspace in your browser. Variables and files stay available between submissions.</p></header>
+<label for="code">C# submission</label><textarea id="code" spellcheck="false">int answer = 40;
+Directory.CreateDirectory("outputs");
+File.WriteAllText("outputs/answer.txt", (answer + 2).ToString());
+Console.WriteLine("Saved outputs/answer.txt");
+answer + 2</textarea>
+<nav><button id="run">Run C#</button><button id="reset" disabled>Reset variables</button><button id="stop" disabled>Stop worker</button>
+<button id="save" disabled>Export files</button><label class="upload">Import files snapshot<input id="import" type="file" accept="application/json,.json"></label></nav>
+<p id="status" role="status">Ready. The first run loads .NET and Roslyn.</p>
+<section><h2>Result</h2><pre id="output" tabindex="0">Output, expression values and diagnostics appear here.</pre></section>
+<section><h2>Workspace files</h2><ul id="files"></ul></section>
+<footer>Runs entirely in a dedicated browser worker. Files are in memory; export a snapshot to keep them across refreshes. Stop discards the worker and its state.</footer>
+</main><script type="module" src="demo.js"></script></body></html>

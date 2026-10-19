@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+<PropertyGroup>
+  <RuntimeIdentifier>browser-wasm</RuntimeIdentifier><OutputType>Exe</OutputType><AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  <PublishTrimmed>false</PublishTrimmed><WasmBuildNative>false</WasmBuildNative>
+  <WasmEnableWebcil>false</WasmEnableWebcil><WasmFingerprintAssets>false</WasmFingerprintAssets><CompressionEnabled>false</CompressionEnabled>
+  <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+</PropertyGroup>
+<ItemGroup><ProjectReference Include="../DotnetDide.Core/DotnetDide.Core.csproj" /></ItemGroup>
+</Project>

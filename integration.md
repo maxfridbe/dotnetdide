@@ -1,0 +1,98 @@
+# Embedding dotnetdide
+
+Serve every file from the published `wwwroot` directory on the same origin over
+HTTPS (or localhost). Import `dotnetdide.js` from that directory. No bundler is
+needed. A strict host CSP must permit same-origin workers, runtime scripts,
+WebAssembly compilation and same-origin asset fetches. Configure external network
+access according to the code your host intends to run.
+
+## Runtime lifecycle
+
+```js
+const runtime = await loadDotnetdide({ signal, startupTimeoutMs: 120000 });
+const result = await runtime.runCSharpAsync(code, { signal, timeoutMs: 30000 });
+```
+
+Options are optional. Without `timeoutMs`, submissions have no execution deadline.
+Calls queue in request order, including file operations and async submissions.
+A completed `runCSharpAsync` resolves even for a compilation/runtime failure;
+inspect `success`. Transport failures, invalid API calls, aborts and termination
+reject the promise.
+
+`result` contains `success`, `stdout`, `stderr`, `value`, `diagnostics`, and `error`.
+Expression `value` is a string representation or null, not a live JavaScript proxy.
+Diagnostics include ID, message, severity, and one-based line/column. Runtime
+errors include the .NET exception type and message. Output is bounded to one
+million characters per stream, followed by an explicit truncation marker.
+
+Successful submissions extend the script chain. A compilation error changes
+nothing. A runtime error does not add new declarations to the chain, but earlier
+variables and filesystem side effects already performed by that code remain.
+This is execution, not a transaction. `await` is supported; background tasks not
+awaited by a submission are outside its output-capture lifetime.
+
+`reset()` clears script variables/imports/types and keeps files. It does not reclaim
+loaded assemblies. `terminate()` immediately kills the worker, rejects pending
+calls and discards its variables and files. Aborting or timing out an active
+request does the same, including any other queued requests. A pre-aborted request
+is rejected without destroying a healthy worker. To resume after termination,
+load a new worker and import a previously exported snapshot. Code is never replayed
+automatically. There is no transparent cancellation-and-continue guarantee.
+
+## Shared filesystem
+
+The `.NET browser-wasm` runtime provides the in-memory filesystem. `System.IO`
+and the exported `FS` calls operate on the same files, not mirrored copies.
+C# execution starts in `/home/dotnetdide`. Changing its current directory only
+affects that submission; the next submission starts at the workspace root.
+
+| API | Behavior |
+| --- | --- |
+| `FS.cwd()` | Workspace root path |
+| `FS.mkdir(path)` | Create directory and missing parents |
+| `FS.writeFile(path, stringOrUint8Array)` | Write UTF-8 text or exact bytes; parent must exist |
+| `FS.readFile(path, {encoding: 'utf8'})` | Read text; omit options for `Uint8Array` |
+| `FS.readdir(path = '.')` | Sorted names, excluding `.` and `..` |
+| `FS.stat(path)` | `{name, isDirectory, size}`; byte size, zero for directories |
+| `FS.rename(from, to)` | Move without overwriting an existing destination |
+| `FS.unlink(path)` | Remove a file; directories rejected |
+| `FS.rmdir(path, {recursive: false})` | Remove a directory; non-empty requires recursive |
+
+The API rejects paths escaping the workspace and symbolic links. It does not
+expose the entire runtime filesystem. These restrictions do not sandbox arbitrary
+C# `System.IO` calls; each worker still owns its runtime filesystem.
+
+## Session file snapshots
+
+```json
+{
+  "version": 1,
+  "directories": ["outputs", "outputs/empty"],
+  "files": [{"path": "outputs/data.bin", "data": "AP+A"}]
+}
+```
+
+`exportWorkspace()` returns this structure. `importWorkspace(snapshot)` replaces
+the workspace. It validates version, canonical relative paths, duplicates,
+file/directory conflicts, and base64 before replacing existing data. It stages
+contents separately and preserves the old workspace on validation/write failure.
+Limits are 4,096 entries and 64 MiB decoded file bytes per snapshot. Directories
+are preserved, including empty ones. Runtime file writes themselves are not
+quota-managed. Snapshots contain files only, never C# variables or host credentials.
+
+The embedding host decides whether to save snapshots to IndexedDB, a session
+record, or downloads. Refreshing an unsaved runspace discards it. Keep the complete
+published asset tree together when upgrading the SDK/runtime.
+
+## .NET API
+
+`DotnetDide.Core` exposes `Runspace`, `WorkspaceFileSystem`, `RunResult`, and
+`WorkspaceSnapshot`. Supply Roslyn metadata references when creating a runspace.
+The browser bridge resolves these from the runtime's real DLL assets, following
+WasmSharp's approach. Native code may use trusted platform assemblies as the tests
+do. `RunAsync` serializes execution because `Console` and current directory are
+runtime-global. File operations, reset and disposal should be issued while idle
+from native callers; the browser worker enforces this queue automatically.
+
+The .NET cancellation token supports waiting/compilation cancellation; it cannot
+interrupt arbitrary running IL. Browser termination is the hard-stop mechanism.

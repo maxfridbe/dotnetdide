@@ -1,0 +1,15 @@
+dotnetdide
+
+Based on the browser Roslyn compilation and assembly-loading approach demonstrated by
+WasmSharp (JakeYallop), licensed under the Apache License, Version 2.0:
+https://github.com/JakeYallop/WasmSharp
+Reference commit: 2f8c93bfa39f2068ad932a748ba23f740075327c
+
+This is a .NET-first adaptation, not an unmodified distribution of WasmSharp.
+It replaces the TypeScript/Comlink/pnpm packaging with .NET projects, C# tests,
+and a small dependency-free JavaScript loader/worker bridge. The persistent
+submission chain and System.IO workspace API are implemented in this repository.
+
+.NET and Roslyn are Microsoft/.NET Foundation projects distributed under their
+respective licenses. NuGet dependency versions and transitive packages are recorded
+in packages.lock.json files.

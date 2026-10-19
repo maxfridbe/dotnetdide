@@ -1,0 +1,6 @@
+**/bin/
+**/obj/
+artifacts/
+.toolchain/
+.vs/
+TestResults/

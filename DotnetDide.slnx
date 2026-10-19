@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="src/DotnetDide.Core/DotnetDide.Core.csproj" />
+  <Project Path="src/DotnetDide.Browser/DotnetDide.Browser.csproj" />
+  <Project Path="tests/DotnetDide.Core.Tests/DotnetDide.Core.Tests.csproj" />
+  <Project Path="tests/DotnetDide.Browser.Tests/DotnetDide.Browser.Tests.csproj" />
+  <Project Path="tools/DotnetDide.Server/DotnetDide.Server.csproj" />
+</Solution>
