@@ -13,6 +13,8 @@ public sealed class BrowserTests
         Assert.True(json.GetProperty("success").GetBoolean(), json.ToString()); Assert.Equal("{\"answer\":42}", json.GetProperty("value").GetString());
         var custom = await browser.EvaluateAsync("return await httpRuntime.runCSharpAsync('using System.Net.Http; using (var req = new HttpRequestMessage(HttpMethod.Get, ' + JSON.stringify(originUrl + '/network-probe') + ')) { using (var response = await Dotnetdide.Net.SendAsync(req)) { Console.Write(await response.Content.ReadAsStringAsync()); } }');");
         Assert.True(custom.GetProperty("success").GetBoolean(), custom.ToString()); Assert.Equal("network-ok", custom.GetProperty("stdout").GetString());
+        var cancelled = await browser.EvaluateAsync("return await httpRuntime.runCSharpAsync('using (var cts = new System.Threading.CancellationTokenSource(100)) { try { await Dotnetdide.Net.GetStringAsync(' + JSON.stringify(originUrl + '/network-slow') + ', cts.Token); Console.Write(\"unexpected\"); } catch (OperationCanceledException) { Console.Write(\"cancelled\"); } }');");
+        Assert.True(cancelled.GetProperty("success").GetBoolean(), cancelled.ToString()); Assert.Equal("cancelled", cancelled.GetProperty("stdout").GetString());
         await browser.EvaluateAsync("httpRuntime.terminate();");
     }
     [Fact]

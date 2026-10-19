@@ -2,20 +2,14 @@
 // C# code, not an isolation boundary for hostile JS interop or dynamically imported code.
 export function installNetworkPolicy(scope = globalThis) {
   let allowed = true; // Runtime bootstrap must load its own assemblies before user code exists.
-  const requests = new Set();
   const sockets = new Set();
   const denied = () => new DOMException('Network access is disabled by the host.', 'NotAllowedError');
   const originalFetch = scope.fetch.bind(scope);
   Object.defineProperty(scope, 'fetch', { configurable: false, writable: false,
     value: async (input, init = {}) => {
       if (!allowed) throw denied();
-      const controller = new AbortController();
-      const callerSignal = init.signal ?? (input instanceof Request ? input.signal : undefined);
-      const abort = () => controller.abort(callerSignal.reason);
-      if (callerSignal?.aborted) abort(); else callerSignal?.addEventListener('abort', abort, { once: true });
-      requests.add(controller);
-      try { return await originalFetch(input, { ...init, signal: controller.signal }); }
-      finally { requests.delete(controller); callerSignal?.removeEventListener('abort', abort); }
+      // Preserve fetch's signal through body consumption, not only until headers arrive.
+      return originalFetch(input, init);
     } });
   for (const name of ['WebSocket', 'EventSource', 'WebTransport', 'XMLHttpRequest']) {
     const Original = scope[name];
@@ -38,7 +32,6 @@ export function installNetworkPolicy(scope = globalThis) {
     if (typeof enabled !== 'boolean') throw new TypeError('networkAccess must be a boolean.');
     allowed = enabled;
     if (!allowed) {
-      for (const request of requests) request.abort(denied());
       for (const socket of sockets) { socket.close?.(); socket.abort?.(); }
       sockets.clear();
     }

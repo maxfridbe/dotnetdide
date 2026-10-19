@@ -136,7 +136,8 @@ artifacts, default behavior and browser limitations. The published site includes
 
 Network access defaults to **off**. The host opts in with
 `loadDotnetdide({ networkAccess: true })` and can change it while idle with
-`await runtime.setNetworkAccess(false)` without losing variables or files.
+`await runtime.setNetworkAccess(false)` without losing variables or files. This gates new HTTP requests; use
+`runtime.terminate()` to stop outstanding requests and code immediately.
 The setting controls worker `fetch` (including ordinary `HttpClient`), XHR,
 WebSocket, EventSource and WebTransport. Runtime assets load during startup
 before user code runs. Model/API requests made by the embedding page are separate.

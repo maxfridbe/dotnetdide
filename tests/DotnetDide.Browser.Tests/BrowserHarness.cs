@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,6 +40,12 @@ internal sealed class BrowserHarness : IAsyncDisposable
         _server.MapGet("/network-probe", () => { NetworkRequests++; return "network-ok"; });
         _server.MapPost("/network-echo", async (Microsoft.AspNetCore.Http.HttpRequest request) => {
             using var reader = new StreamReader(request.Body); return await reader.ReadToEndAsync();
+        });
+        _server.MapGet("/network-slow", async (HttpContext context) => {
+            context.Response.ContentType = "text/plain";
+            await context.Response.StartAsync();
+            await Task.Delay(1000);
+            await context.Response.WriteAsync("late");
         });
         await _server.StartAsync();
         var origin = _server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
