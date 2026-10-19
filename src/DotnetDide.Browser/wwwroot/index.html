@@ -1,17 +1,57 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>dotnetdide · .NET 11 runspace</title><link rel="stylesheet" href="demo.css"></head>
-<body><main><header><p class="eyebrow">C# · WEBASSEMBLY · LOCAL EXECUTION</p><h1>dotnetdide</h1>
-<p>A .NET 11 runspace in your browser. Variables and files stay available between submissions.</p></header>
-<label for="code">C# submission</label><textarea id="code" spellcheck="false">int answer = 40;
-Directory.CreateDirectory("outputs");
-File.WriteAllText("outputs/answer.txt", (answer + 2).ToString());
-Console.WriteLine("Saved outputs/answer.txt");
-answer + 2</textarea>
-<nav><button id="run">Run C#</button><button id="reset" disabled>Reset variables</button><button id="stop" disabled>Stop worker</button>
-<button id="save" disabled>Export files</button><label class="upload">Import files snapshot<input id="import" type="file" accept="application/json,.json"></label></nav>
-<p id="status" role="status">Ready. The first run loads .NET and Roslyn.</p>
-<section><h2>Result</h2><pre id="output" tabindex="0">Output, expression values and diagnostics appear here.</pre></section>
-<section><h2>Workspace files</h2><ul id="files"></ul></section>
-<footer>Runs entirely in a dedicated browser worker. Files are in memory; export a snapshot to keep them across refreshes. Stop discards the worker and its state.</footer>
-</main><script type="module" src="demo.js"></script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Try C# and .NET 11 in your browser: live examples, a virtual filesystem and real WebAssembly runtime checks.">
+  <title>dotnetdide · C# playground</title>
+  <link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<main>
+  <header>
+    <div class="brand"><a href="./">dotnet<span>dide</span><span class="badge">.NET 11 RC2</span></a><a class="source" href="https://github.com/maxfridbe/dotnetdide">Source ↗</a></div>
+    <p class="eyebrow">C# · WEBASSEMBLY · IN YOUR BROWSER</p>
+    <h1>A little .NET lab.<br><span>A real runtime.</span></h1>
+    <p class="intro">Write C#, keep variables between runs, and create files you can download. Compilation and execution happen locally in a browser worker.</p>
+  </header>
+  <div class="workspace">
+    <aside aria-labelledby="examples-title">
+      <h2 id="examples-title">Explore the examples</h2>
+      <nav id="examples" aria-label="Code examples"></nav>
+      <div class="checks-panel">
+        <h2>Does it work here?</h2>
+        <p>Run every example with assertions in a separate workspace. Your editor and files stay intact.</p>
+        <button id="check">Run all checks</button>
+        <p id="check-summary" role="status">8 examples · real .NET execution</p>
+        <ol id="checks" aria-label="Check results"></ol>
+      </div>
+    </aside>
+    <div class="lab">
+      <section class="editor-panel" aria-labelledby="example-title">
+        <div class="section-heading"><h2 id="example-title">Create a file</h2><span class="badge">Editable C#</span></div>
+        <p id="description"></p><p id="expected" class="expected"></p>
+        <div id="steps" role="group" aria-label="Example steps"></div>
+        <label class="sr-only" for="code">C# submission</label>
+        <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-describedby="editor-help"></textarea>
+        <div class="toolbar"><button id="run" class="primary">▶ Run C#</button><button id="reset" disabled>Reset variables</button><button id="stop" disabled>Stop worker</button></div>
+        <p id="editor-help" class="hint">Ctrl/⌘ + Enter to run. Variables persist until reset; files remain until the worker stops.</p>
+        <p id="status" role="status" data-state="ready">Ready. First run downloads about 46 MiB of .NET and Roslyn.</p>
+      </section>
+      <section class="result-panel" aria-labelledby="result-title">
+        <div class="section-heading"><h2 id="result-title">Result</h2><span id="timing" class="hint"></span></div>
+        <pre id="result" tabindex="0">Choose an example, edit it, and press Run C#.</pre>
+        <details><summary>Raw result / diagnostics</summary><pre id="output" tabindex="0">No submissions yet.</pre></details>
+      </section>
+      <section class="files-panel" aria-labelledby="files-title">
+        <div class="section-heading"><h2 id="files-title">Workspace files <span id="file-count">(0)</span></h2><button id="save" disabled>Export snapshot</button></div>
+        <ul id="files"><li class="hint">No files yet. Try “Create a file”.</li></ul>
+        <label class="upload" for="import">Restore a files snapshot<input id="import" type="file" accept="application/json,.json"></label>
+      </section>
+    </div>
+  </div>
+  <footer><p>Files and variables live in memory. Export a files snapshot before refreshing. Snapshots contain files, not C# variables. Stop discards the current worker.</p><p><a href="https://github.com/maxfridbe/dotnetdide/blob/master/integration.md">Embedding guide ↗</a><a href="https://github.com/maxfridbe/dotnetdide/blob/master/docs/runtime-assemblies.md">Available libraries ↗</a><span>No Node.js dependencies.</span></p></footer>
+</main>
+<script type="module" src="demo.js"></script>
+</body>
+</html>

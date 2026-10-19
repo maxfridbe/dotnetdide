@@ -21,3 +21,29 @@ jobs:
         with:
           name: dotnetdide-browser
           path: artifacts/site/wwwroot
+      - uses: actions/upload-pages-artifact@v4
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        with:
+          path: artifacts/site/wwwroot
+      - uses: actions/upload-artifact@v4
+        with:
+          name: playground-screenshots
+          path: artifacts/playground-*.png
+  deploy:
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy testing page
+        id: deployment
+        uses: actions/deploy-pages@v4

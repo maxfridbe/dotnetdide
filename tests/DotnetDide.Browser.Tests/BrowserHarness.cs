@@ -93,10 +93,14 @@ internal sealed class BrowserHarness : IAsyncDisposable
         }
         throw new TimeoutException("Browser condition failed: " + expression);
     }
-    public async Task ScreenshotAsync()
+    public async Task SetViewportAsync(int width, int height)
+    {
+        await CallAsync("Emulation.setDeviceMetricsOverride", new { width, height, deviceScaleFactor = 1, mobile = true });
+    }
+    public async Task ScreenshotAsync(string name = "demo.png")
     {
         var result = await CallAsync("Page.captureScreenshot", new { format = "png" });
-        await File.WriteAllBytesAsync(Path.Combine(Root, "artifacts/demo.png"), Convert.FromBase64String(result.GetProperty("data").GetString()!));
+        await File.WriteAllBytesAsync(Path.Combine(Root, "artifacts", name), Convert.FromBase64String(result.GetProperty("data").GetString()!));
     }
     public async ValueTask DisposeAsync()
     {

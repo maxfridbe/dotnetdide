@@ -35,4 +35,42 @@ public sealed class BrowserTests
         await browser.EvaluateAsync("document.querySelector('#stop').click();");
 
     }
+    [Fact]
+    public async Task PlaygroundExamplesPassWithoutChangingTheInteractiveWorkspace()
+    {
+        await using var browser = new BrowserHarness(); await browser.StartAsync();
+        Assert.Equal(8, (await browser.EvaluateAsync("return document.querySelectorAll('#examples button').length;")).GetInt32());
+        await browser.EvaluateAsync("document.querySelector('#run').click();");
+        await browser.WaitForAsync("!document.querySelector('#run').disabled && !!document.querySelector('#files button')");
+        await browser.EvaluateAsync("document.querySelector('#check').click();");
+        await browser.WaitForAsync("!document.querySelector('#check').disabled");
+        Assert.True((await browser.EvaluateAsync("return document.querySelector('#check-summary').textContent === '8/8 checks passed';")).GetBoolean(), (await browser.EvaluateAsync("return document.querySelector('#checks').textContent + document.querySelector('#status').textContent;")).GetString());
+        Assert.Equal(8, (await browser.EvaluateAsync("return document.querySelectorAll('#checks [data-state=pass]').length;")).GetInt32());
+        Assert.Contains("outputs/answer.txt", (await browser.EvaluateAsync("return document.querySelector('#files').textContent;")).GetString());
+        await browser.EvaluateAsync("document.querySelector('#code').value='answer + 3'; document.querySelector('#run').click();");
+        await browser.WaitForAsync("!document.querySelector('#run').disabled");
+        Assert.Equal("43", (await browser.EvaluateAsync("return JSON.parse(document.querySelector('#output').textContent).value;")).GetString());
+        await browser.EvaluateAsync("document.querySelector('[data-example=state]').click(); document.querySelector('#run').click();");
+        await browser.WaitForAsync("!document.querySelector('#run').disabled");
+        await browser.EvaluateAsync("document.querySelectorAll('#steps button')[1].click(); document.querySelector('#run').click();");
+        await browser.WaitForAsync("!document.querySelector('#run').disabled");
+        Assert.Equal("42", (await browser.EvaluateAsync("return JSON.parse(document.querySelector('#output').textContent).value;")).GetString());
+        await browser.EvaluateAsync("document.querySelector('[data-example=diagnostics]').click(); document.querySelector('#run').click();");
+        await browser.WaitForAsync("!document.querySelector('#run').disabled");
+        Assert.Contains("CS0103", (await browser.EvaluateAsync("return document.querySelector('#result').textContent;")).GetString());
+        await browser.EvaluateAsync("document.querySelector('[data-example=files]').click(); document.querySelector('#run').click();");
+        await browser.WaitForAsync("!document.querySelector('#run').disabled");
+        await browser.ScreenshotAsync("playground-desktop.png");
+        await browser.SetViewportAsync(390, 844);
+        Assert.True((await browser.EvaluateAsync("return document.documentElement.scrollWidth <= innerWidth;")).GetBoolean());
+        await browser.ScreenshotAsync("playground-mobile.png");
+        await browser.EvaluateAsync("document.querySelector('#code').value='while(true) {}'; document.querySelector('#run').click();");
+        await browser.WaitForAsync("document.querySelector('#status').textContent.includes('Compiling')");
+        await browser.EvaluateAsync("document.querySelector('#stop').click();");
+        Assert.False((await browser.EvaluateAsync("return document.querySelector('#run').disabled;")).GetBoolean());
+        await browser.EvaluateAsync("document.querySelector('#code').value='6 * 7'; document.querySelector('#run').click();");
+        await browser.WaitForAsync("!document.querySelector('#run').disabled");
+        Assert.Equal("42", (await browser.EvaluateAsync("return JSON.parse(document.querySelector('#output').textContent).value;")).GetString());
+        await browser.EvaluateAsync("document.querySelector('#stop').click();");
+    }
 }

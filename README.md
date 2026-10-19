@@ -1,5 +1,10 @@
 # dotnetdide
 
+**[Try it now — C# playground](https://maxfridbe.github.io/dotnetdide/)** ·
+Editable examples, downloadable files and real browser runtime checks.
+
+[![dotnetdide browser playground](docs/images/playground.png)](https://maxfridbe.github.io/dotnetdide/)
+
 A .NET 11 browser runspace with persistent C# submissions and a shared virtual
 filesystem, inspired by [WasmSharp](https://github.com/JakeYallop/WasmSharp).
 
@@ -30,6 +35,23 @@ compression, HTTP and `System.IO`. File operations use the same virtual filesyst
 as the browser `FS` API. Assembly presence does not guarantee browser support for
 every API; native OS facilities may throw `PlatformNotSupportedException`.
 Additional NuGet packages cannot currently be installed at runtime.
+
+## Browser playground
+
+The [GitHub Pages testing page](https://maxfridbe.github.io/dotnetdide/) includes
+examples for persistent variables, LINQ, JSON, System.IO, ZIP archives, async code,
+compiler diagnostics and runtime exceptions. Select an example, edit it and click
+**Run C#** (or Ctrl/⌘ + Enter). The variables example has two steps to run in order.
+**Run all checks** verifies every example in a separate workspace without changing
+your interactive session. Expected compiler/runtime errors count as passing checks.
+
+The first run downloads approximately 46 MiB of runtime/compiler assets. Files and
+variables are in memory; export a files snapshot before refreshing. You can restore
+files from that snapshot, but variable state is not serialized.
+
+Pushes to `master` build and test the actual WebAssembly site before deploying it
+to GitHub Pages. In repository **Settings → Pages → Build and deployment**, select
+**GitHub Actions** as the source. The same page can be served locally below.
 
 ## Build and test
 
