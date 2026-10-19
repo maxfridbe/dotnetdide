@@ -18,6 +18,19 @@ loads the runtime, carries worker messages and presents the small demo.
 - Isolate each runspace in its own worker. Terminate a worker even during an infinite loop.
 - Reset variables while retaining files, or start a fresh worker for a full reset.
 
+## Available .NET libraries
+
+See the [full runtime assembly list](docs/runtime-assemblies.md) for the libraries
+included in the pinned .NET 11 build: **185 assembly references**, including
+**164 `System.*` assemblies**. They are already referenced by the C# compiler;
+use their namespaces directly in submissions without a separate loading step.
+
+The inventory includes collections, LINQ, JSON, regular expressions, XML,
+compression, HTTP and `System.IO`. File operations use the same virtual filesystem
+as the browser `FS` API. Assembly presence does not guarantee browser support for
+every API; native OS facilities may throw `PlatformNotSupportedException`.
+Additional NuGet packages cannot currently be installed at runtime.
+
 ## Build and test
 
 Install the SDK pinned in `global.json`: **11.0.100-rc.2.26504.105**. This is a
