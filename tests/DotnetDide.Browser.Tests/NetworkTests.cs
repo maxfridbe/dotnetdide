@@ -3,6 +3,36 @@ namespace DotnetDide.Browser.Tests;
 public sealed class NetworkTests
 {
     [Fact]
+    public async Task RelayPreservesPayloadsWhenRequestBodyStreamIsUnavailable()
+    {
+        await using var browser = new BrowserHarness(); await browser.StartAsync();
+        var result = await browser.EvaluateAsync("""
+            const {relayFetch}=await import('./relay-fetch.js');
+            const descriptor=Object.getOwnPropertyDescriptor(Request.prototype,'body');
+            let calls=0;
+            try {
+              // Firefox exposes arrayBuffer/text but not Request.body in this environment.
+              Object.defineProperty(Request.prototype,'body',{configurable:true,get:()=>undefined});
+              const relay={endpoint:location.origin+'/relay',token:'regression-test-token-123456789'};
+              for(const method of ['GET','HEAD','OPTIONS','DELETE','POST','PUT','PATCH']) {
+                const payload=['POST','PUT','PATCH'].includes(method)?new Uint8Array([0,255,128]):undefined;
+                const response=await relayFetch(async (url,init)=>{
+                  calls++; const envelope=JSON.parse(init.body);
+                  if(envelope.method!==method || envelope.bodyBase64!==(payload?'AP+A':['GET','HEAD'].includes(method)?null:''))throw Error('Relay lost request body: '+method);
+                  if(init.headers.Authorization!=='Bearer '+relay.token || envelope.headers.authorization!=='Bearer target-key')throw Error('Relay and target credentials mixed');
+                  return new Response(JSON.stringify({status:200,headers:{'Content-Type':'application/octet-stream'},bodyBase64:envelope.bodyBase64??''}));
+                },relay,'https://target.example/api',{method,headers:{Authorization:'Bearer target-key'},body:payload});
+                if((await response.arrayBuffer()).byteLength!==(payload?3:0))throw Error('Relay response lost bytes');
+              }
+              return calls;
+            } finally {
+              if(descriptor)Object.defineProperty(Request.prototype,'body',descriptor);else delete Request.prototype.body;
+            }
+            """);
+        Assert.Equal(7, result.GetInt32());
+    }
+
+    [Fact]
     public async Task HttpMethodsBrowserOptionsStreamsAndDownloadsWorkInWasm()
     {
         await using var browser = new BrowserHarness(); await browser.StartAsync();

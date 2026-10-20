@@ -44,7 +44,9 @@ export async function relayFetch(fetch, relay, input, init) {
   if (!['GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) throw new TypeError('Unsupported relay HTTP method.');
   request.signal.throwIfAborted();
   // Relay v1 deliberately buffers bounded bodies; no WebSocket, SSE or unbounded streaming tunnel.
-  const bytes = request.body ? new Uint8Array(await request.arrayBuffer()) : null;
+  // Firefox can read arrayBuffer() while Request.body is unavailable. Do not
+  // use the optional stream getter to decide whether a payload exists.
+  const bytes = ['GET', 'HEAD'].includes(request.method) ? null : new Uint8Array(await request.arrayBuffer());
   if (bytes && bytes.length > MAX_BYTES) throw new Error('Relay request exceeds 8 MiB.');
   const response = await fetch(relay.endpoint, {
     method: 'POST', mode: 'cors', credentials: 'omit', redirect: 'error', cache: 'no-store', signal: request.signal,
