@@ -22,6 +22,7 @@ internal sealed class BrowserHarness : IAsyncDisposable
     private WebApplication? _server;
     private Process? _chrome;
     private int _id;
+    private string? _mainSession;
     public string Root { get; }
     public int NetworkRequests { get; private set; }
     public BrowserHarness()
@@ -69,7 +70,10 @@ internal sealed class BrowserHarness : IAsyncDisposable
         using var http = new HttpClient();
         using var targets = JsonDocument.Parse(await http.GetStringAsync($"http://127.0.0.1:{port}/json/list"));
         var target = targets.RootElement.EnumerateArray().First(x => x.GetProperty("type").GetString() == "page");
-        await _socket.ConnectAsync(new Uri(target.GetProperty("webSocketDebuggerUrl").GetString()!), CancellationToken.None);
+        using var version = JsonDocument.Parse(await http.GetStringAsync($"http://127.0.0.1:{port}/json/version"));
+        await _socket.ConnectAsync(new Uri(version.RootElement.GetProperty("webSocketDebuggerUrl").GetString()!), CancellationToken.None);
+        var attached = await CallAsync("Target.attachToTarget", new { targetId = target.GetProperty("id").GetString(), flatten = true });
+        _mainSession = attached.GetProperty("sessionId").GetString();
         await CallAsync("Page.enable", new { });
         await CallAsync("Runtime.enable", new { });
         if (blockMonaco)
@@ -85,11 +89,12 @@ internal sealed class BrowserHarness : IAsyncDisposable
         }
         await EvaluateAsync("globalThis.api = await import('./dotnetdide.js')");
     }
-    private async Task<JsonElement> CallAsync(string method, object parameters)
+    private async Task<JsonElement> CallAsync(string method, object parameters, string? sessionId = null)
     {
         var id = ++_id;
+        sessionId ??= _mainSession;
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
-        await _socket.SendAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { id, method, @params = parameters })), WebSocketMessageType.Text, true, timeout.Token);
+        await _socket.SendAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { id, method, @params = parameters, sessionId }, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull })), WebSocketMessageType.Text, true, timeout.Token);
         var buffer = new byte[65536];
         while (true)
         {
@@ -106,6 +111,29 @@ internal sealed class BrowserHarness : IAsyncDisposable
         var result = await CallAsync("Runtime.evaluate", new { expression = "(async()=>{" + script + "})()", awaitPromise = true, returnByValue = true });
         if (result.TryGetProperty("exceptionDetails", out var error)) throw new InvalidOperationException(error.ToString());
         return result.GetProperty("result").TryGetProperty("value", out var value) ? value.Clone() : default;
+    }
+    public async Task<JsonElement> EvaluateFrameAsync(string id, string script)
+    {
+        // Sandboxed documents have their own renderer target. Attach without weakening isolation.
+        JsonElement target = default;
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            var targets = await CallAsync("Target.getTargets", new { });
+            target = targets.GetProperty("targetInfos").EnumerateArray().LastOrDefault(item =>
+                item.GetProperty("type").GetString() == "iframe" && item.GetProperty("url").GetString()!.Contains("wire-preview-host.html"));
+            if (target.ValueKind != JsonValueKind.Undefined) break;
+            await Task.Delay(50);
+        }
+        if (target.ValueKind == JsonValueKind.Undefined) throw new InvalidOperationException($"Preview frame {id} did not load.");
+        var attached = await CallAsync("Target.attachToTarget", new { targetId = target.GetProperty("targetId").GetString(), flatten = true });
+        var session = attached.GetProperty("sessionId").GetString();
+        try
+        {
+            var response = await CallAsync("Runtime.evaluate", new { expression = "(async()=>{" + script + "})()", awaitPromise = true, returnByValue = true }, session);
+            if(response.TryGetProperty("exceptionDetails",out var error))throw new InvalidOperationException(error.ToString());
+            return response.GetProperty("result").GetProperty("value").Clone();
+        }
+        finally { await CallAsync("Target.detachFromTarget", new { sessionId = session }); }
     }
     public async Task WaitForAsync(string expression)
     {

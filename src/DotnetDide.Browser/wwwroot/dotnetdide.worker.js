@@ -13,7 +13,7 @@ async function dispatch({ operation, payload }) {
     const resources = config.resources;
     const assets = [...resources.coreAssembly, ...resources.assembly];
     const urls = assets.map(asset => new URL(asset.resolvedUrl ?? asset.name, new URL('./_framework/', import.meta.url)).href);
-    const version = await bridge.Initialize(urls, payload.nugetAccess);
+    const version = await bridge.Initialize(urls, payload.nugetAccess, payload.siteAccess);
     setNetworkAccess(payload.networkAccess, payload.relay);
     setNetworkAccess.setNugetAccess(payload.nugetAccess);
     return version;
@@ -21,6 +21,9 @@ async function dispatch({ operation, payload }) {
   if (!bridge) throw new Error('Runtime is not initialized.');
   if (operation === 'network') { setNetworkAccess(payload); return; }
   if (operation === 'nuget') { bridge.SetNugetAccess(payload); setNetworkAccess.setNugetAccess(payload); return; }
+  if (operation === 'site-access') { bridge.SetSiteAccess(payload); return; }
+  if (operation === 'sites') return JSON.parse(bridge.Sites());
+  if (operation === 'site-request') return JSON.parse(await bridge.Request(JSON.stringify(payload)));
   if (operation === 'run') return JSON.parse(await bridge.Run(payload));
   if (operation === 'reset') { bridge.Reset(); return; }
   if (operation === 'files') return JSON.parse(bridge.Files(JSON.stringify(payload)));

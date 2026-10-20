@@ -1,8 +1,9 @@
-import { loadDotnetdide } from './dotnetdide.js';
+import { loadDotnetdide, createWirePreview } from './dotnetdide.js';
 import { examples } from './examples.js';
 import { createCodeEditor } from './code-editor.js';
 
 const field = id => document.getElementById(id);
+let preview, previewRuntime, wireBusy = false;
 let runtime, job, selected = examples[0];
 const codeEditor = createCodeEditor({
   container: field('code-editor'), fallback: field('code'), host: field('monaco'),
@@ -18,9 +19,10 @@ function status(message, state = 'ready') {
   field('status').dataset.state = state;
 }
 function buttons() {
-  for (const id of ['run', 'import', 'check', 'nuget-access']) field(id).disabled = !!job;
-  for (const id of ['reset', 'save']) field(id).disabled = !!job || !runtime;
+  for (const id of ['run', 'import', 'check', 'nuget-access', 'site-access']) field(id).disabled = !!job || wireBusy;
+  for (const id of ['reset', 'save']) field(id).disabled = !!job || wireBusy || !runtime;
   field('stop').disabled = !job && !runtime;
+  for (const id of ['site-open','site-stop']) field(id).disabled = !!job || wireBusy || !field('site-port').value;
 }
 function loadStep(index) {
   codeEditor.setValue(selected.steps[index]);
@@ -84,11 +86,11 @@ async function action(work, { isolated = false } = {}) {
   try {
     if (isolated || !runtime) {
       status('Loading .NET 11 and Roslyn… First load may take a minute.', 'busy');
-      current.runtime = await loadDotnetdide({ signal: current.controller.signal, nugetAccess: field('nuget-access').checked });
+      current.runtime = await loadDotnetdide({ signal: current.controller.signal, nugetAccess: field('nuget-access').checked, siteAccess: isolated || field('site-access').checked });
       if (!isolated) runtime = current.runtime;
     } else current.runtime = runtime;
     const message = await work(current.runtime, current.controller.signal);
-    if (!isolated) await refreshFiles(current.runtime);
+    if (!isolated) { await refreshFiles(current.runtime); await refreshSites(current.runtime); }
     if (job === current) status(message || `.NET ${current.runtime.version} · Ready`);
   } catch (error) {
     if (job === current) status(String(error), 'error');
@@ -97,6 +99,7 @@ async function action(work, { isolated = false } = {}) {
     if (job === current) { job = null; buttons(); }
   }
 }
+field('site-access').onchange = () => { clearPreview(); return action(async active => { await active.setSiteAccess(field('site-access').checked); return 'Interactive sites ' + (field('site-access').checked ? 'enabled' : 'disabled'); }); };
 field('nuget-access').onchange = () => action(async active => { await active.setNugetAccess(field('nuget-access').checked); return 'NuGet package access ' + (field('nuget-access').checked ? 'enabled' : 'disabled'); });
 field('run').onclick = () => {
   const code = codeEditor.getValue();
@@ -109,8 +112,9 @@ field('run').onclick = () => {
     return result.success ? undefined : 'Submission failed. See the diagnostics below. Ready for another run.';
   });
 };
-field('reset').onclick = () => action(async active => { await active.reset(); return 'Variables reset; workspace files retained. Ready.'; });
+field('reset').onclick = () => action(async active => { clearPreview(); await active.reset(); return 'Variables reset; workspace files retained. Ready.'; });
 field('stop').onclick = () => {
+  clearPreview(); field('site-port').replaceChildren(); field('site-status').textContent = 'Worker stopped.';
   const current = job; job = null;
   current?.controller.abort(); current?.runtime?.terminate();
   runtime?.terminate(); runtime = null;
@@ -155,4 +159,42 @@ field('check').onclick = () => {
     for (const row of rows) if (row.dataset.state === 'running' || row.dataset.state === 'pending') { row.dataset.state = 'fail'; row.textContent += ' · Not completed'; }
     if (rows.some(row => row.dataset.state === 'fail')) field('check-summary').textContent = `${rows.filter(row => row.dataset.state === 'pass').length}/${examples.length} checks passed; see failures and status.`;
   });
+};
+
+function clearPreview() { preview?.destroy(); preview = null; previewRuntime = null; field('site-frame').hidden = true; }
+async function refreshSites(active) {
+  const sites = await active.listSites(); if (active !== runtime) return;
+  const previous = field('site-port').value;
+  field('site-port').replaceChildren(...sites.map(site => new Option(`:${site.port} · ${site.webRoot ?? 'Routes'}`, String(site.port))));
+  if (sites.some(site => String(site.port) === previous)) field('site-port').value = previous;
+  if (!sites.length) { clearPreview(); field('site-status').textContent = field('site-access').checked ? 'No site running. Run the site example.' : 'Interactive sites are disabled.'; }
+  buttons();
+}
+let siteQueue = Promise.resolve();
+field('site-open').onclick = async () => {
+  if (job || wireBusy || !runtime || !field('site-port').value) return;
+  clearPreview(); const active = runtime; previewRuntime = active;
+  try {
+    const created = await createWirePreview({iframe:field('site-frame'),port:Number(field('site-port').value),path:field('site-path').value,
+      onNavigate:path=>{field('site-path').value=path;},
+      request: value => {
+        const next = siteQueue.catch(()=>{}).then(async () => {
+          if (runtime !== active || previewRuntime !== active) throw new Error('Preview stopped.');
+          if (job) throw new Error('Wait for the current C# submission.');
+          wireBusy = true; buttons();
+          try {
+            const response = await active.requestSite(value);
+            await refreshFiles(active);
+            field('site-status').textContent = `${value.method} ${value.path} → ${response.status}${response.error ? ' · '+response.error : ''}`;
+            return response;
+          } finally { wireBusy = false; buttons(); }
+        });
+        siteQueue = next; return next;
+      }});
+    if (previewRuntime !== active) created.destroy(); else { preview = created; field('site-frame').hidden = false; }
+  } catch(error) { clearPreview(); field('site-status').textContent=String(error); }
+};
+field('site-stop').onclick = () => {
+  const port=Number(field('site-port').value); clearPreview();
+  return action(async active => { await active.runCSharpAsync(`DotnetDide.Wire.Stop(${port});`); return `Stopped virtual port ${port}.`; });
 };

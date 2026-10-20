@@ -24,6 +24,7 @@ loads the runtime, carries worker messages and presents the small demo.
 - Reset variables while retaining files, or start a fresh worker for a full reset.
 - Build workspace C# files and supported SDK-style projects into downloadable DLL/PDB files.
 - Run compiled programs with arguments, async entry points, build logs and captured output.
+- Host ASP.NET Core middleware/routes on virtual ports with `DotnetDide.Wire` and an isolated interactive iframe.
 
 ## Build and run saved C# programs
 
@@ -44,10 +45,25 @@ This uses Roslyn and a documented project subset; it does not run MSBuild or res
 PackageReference items; use the separate Nuget.Load API for additional managed libraries. See **[llm.md](llm.md)** for default imports, available namespaces,
 result fields, project support and guidance for generating programs.
 
+## Interactive sites
+
+[![Interactive C# site in the playground](docs/images/wire.png)](https://maxfridbe.github.io/dotnetdide/)
+
+Enable **Interactive sites**, select **Host an interactive site** in the playground,
+run it, and open port 8080. Its HTML/JavaScript calls C# routes and saves a downloadable
+note. `Wire.ListenAsync` implements ASP.NET Core `IServer` without sockets, returns
+immediately, and keeps the site running after a saved program exits.
+
+This is a separate permission, off by default (`siteAccess: true` in the SDK).
+Network and NuGet permissions are independent. The preview supports classic scripts,
+CSS, media and `fetch`; it has no parent storage access, external requests, module
+imports or WebSockets. See the **[Wire guide](docs/wire.md)** for runnable `.cs` and
+`.csproj` examples, embedding, limits and the tested .NET 11 RC2 JSON workaround.
+
 ## Available .NET libraries
 
 See the [full runtime assembly list](docs/runtime-assemblies.md) for the libraries
-included in the pinned .NET 11 build: **193 assembly references**, including
+included in the pinned .NET 11 build: **215 assembly references**, including
 **165 `System.*` assemblies**. They are already referenced by the C# compiler;
 use their namespaces directly in submissions without a separate loading step.
 

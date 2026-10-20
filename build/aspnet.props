@@ -1,0 +1,32 @@
+<Project>
+  <!-- Use managed ASP.NET assemblies from the exact SDK runtime already pinned in global.json.
+       A FrameworkReference would require a nonexistent ASP.NET browser runtime pack. -->
+  <PropertyGroup>
+    <WireAspNetVersion>11.0.0-rc.2.26504.105</WireAspNetVersion>
+    <WireAspNetRoot>$(NetCoreRoot)shared/Microsoft.AspNetCore.App/$(WireAspNetVersion)/</WireAspNetRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="$(WireAspNetRoot)Microsoft.AspNetCore.Authorization.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.AspNetCore.Connections.Abstractions.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.AspNetCore.Hosting.Server.Abstractions.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.AspNetCore.Http.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.AspNetCore.Http.Abstractions.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.AspNetCore.Http.Extensions.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.AspNetCore.Http.Features.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.AspNetCore.Metadata.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.AspNetCore.Routing.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.AspNetCore.Routing.Abstractions.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.AspNetCore.WebUtilities.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.Extensions.Configuration.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.Extensions.Configuration.Binder.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.Extensions.DependencyInjection.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.Extensions.Diagnostics.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.Extensions.Features.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.Extensions.Localization.Abstractions.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.Extensions.Logging.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.Extensions.ObjectPool.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.Extensions.Options.ConfigurationExtensions.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.Extensions.Validation.dll" />
+    <Reference Include="$(WireAspNetRoot)Microsoft.Net.Http.Headers.dll" />
+  </ItemGroup>
+</Project>

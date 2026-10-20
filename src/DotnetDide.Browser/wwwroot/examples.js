@@ -1,4 +1,5 @@
 // The same examples power the editor and real browser checks. No mocked results.
+const siteSource = await (await fetch(new URL('./examples/site.cs', import.meta.url))).text();
 export const examples = [
   {
     id: 'files', title: 'Create a file', category: 'SYSTEM.IO',
@@ -126,5 +127,13 @@ var program = await Dotnet.Run("Demo.csproj");
 program.Success`],
     verify: async (results, runtime) => results[0].value === 'True' && results[0].stdout.includes('Build succeeded') &&
       await runtime.FS.readFile('app/result.txt', { encoding: 'utf8' }) === '42' && (await runtime.FS.readFile('app/bin/Demo.dll')).length > 0,
+  },
+  {
+    id: 'site', title: 'Host an interactive site', category: 'ASP.NET CORE · ISERVER',
+    description: 'Enable Interactive sites below, run the code, then open the virtual port. The page calls C# GET/POST routes and saves a note into workspace files.',
+    expected: 'Creates site/index.html, CSS and JavaScript; registers port 8080. No network permission or real socket is needed.',
+    steps: [siteSource],
+    verify: async (_results, runtime) => (await runtime.listSites()).some(site => site.port === 8080) &&
+      (await runtime.requestSite({port:8080,method:'GET',path:'/api/hello'})).status === 200,
   },
 ];

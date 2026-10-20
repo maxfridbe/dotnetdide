@@ -12,6 +12,8 @@ public sealed class Runspace : IDisposable
     private static readonly SemaphoreSlim RuntimeGate = new(1, 1);
     private readonly List<MetadataReference> _references;
     private readonly PackageLoader _packages;
+    private readonly WireRegistry _wire;
+    public IReadOnlyList<WireSite> WireSites => _wire.Sites;
     private readonly HttpClient? _ownedNugetClient;
     private readonly Dictionary<string, Assembly> _assemblies = new(StringComparer.Ordinal);
     private readonly string _id = Guid.NewGuid().ToString("N");
@@ -22,9 +24,10 @@ public sealed class Runspace : IDisposable
     private bool _disposed;
     public WorkspaceFileSystem Files { get; }
 
-    public Runspace(WorkspaceFileSystem files, IEnumerable<MetadataReference> references, bool nugetAccess = false, HttpClient? nugetClient = null)
+    public Runspace(WorkspaceFileSystem files, IEnumerable<MetadataReference> references, bool nugetAccess = false, HttpClient? nugetClient = null, bool siteAccess = false)
     {
         Files = files; _references = references.ToList();
+        _wire = new(files) { Enabled = siteAccess };
         _ownedNugetClient = nugetClient is null ? new HttpClient() : null;
         _packages = new(nugetClient ?? _ownedNugetClient!, _references, additions =>
         {
@@ -75,7 +78,7 @@ public sealed class Runspace : IDisposable
             try
             {
                 Console.SetOut(stdout); Console.SetError(stderr); Directory.SetCurrentDirectory(Files.RootPath);
-                Nuget.Current.Value = _packages;
+                Nuget.Current.Value = _packages; Wire.Current.Value = _wire;
                 var factory = assembly.GetType("Submission", throwOnError: true)!.GetMethod("<Factory>", BindingFlags.Public | BindingFlags.Static)!;
                 var value = await ((Task<object>)factory.Invoke(null, [_states])!).ConfigureAwait(false);
                 _previous = compilation; _submissions++;
@@ -86,7 +89,33 @@ public sealed class Runspace : IDisposable
                 var cause = error is TargetInvocationException { InnerException: not null } wrapper ? wrapper.InnerException! : error;
                 return new(false, stdout.ToString(), stderr.ToString(), null, diagnostics, new(cause.GetType().FullName!, cause.Message));
             }
-            finally { Nuget.Current.Value = null; Console.SetOut(oldOut); Console.SetError(oldError); Directory.SetCurrentDirectory(oldDirectory); }
+            finally { Wire.Current.Value = null; Nuget.Current.Value = null; Console.SetOut(oldOut); Console.SetError(oldError); Directory.SetCurrentDirectory(oldDirectory); }
+        }
+        finally { if (entered) RuntimeGate.Release(); Interlocked.Decrement(ref _pending); }
+    }
+    public void SetSiteAccess(bool enabled)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (Volatile.Read(ref _pending) != 0) throw new InvalidOperationException("Cannot change permissions on a busy runspace.");
+        if (!enabled) _wire.Dispose();
+        _wire.Enabled = enabled;
+    }
+    public async Task<WireResponse> RequestAsync(WireRequest request, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this); Interlocked.Increment(ref _pending);
+        var entered = false;
+        try
+        {
+            await RuntimeGate.WaitAsync(cancellationToken); entered = true;
+            var previous = Directory.GetCurrentDirectory(); var stdout = Console.Out; var stderr = Console.Error;
+            using var output = new BoundedWriter(); using var errors = new BoundedWriter();
+            try
+            {
+                Directory.SetCurrentDirectory(Files.RootPath); Console.SetOut(output); Console.SetError(errors);
+                Wire.Current.Value = _wire; Nuget.Current.Value = _packages;
+                return await _wire.RequestAsync(request, cancellationToken);
+            }
+            finally { Directory.SetCurrentDirectory(previous); Console.SetOut(stdout); Console.SetError(stderr); Wire.Current.Value = null; Nuget.Current.Value = null; }
         }
         finally { if (entered) RuntimeGate.Release(); Interlocked.Decrement(ref _pending); }
     }
@@ -100,14 +129,14 @@ public sealed class Runspace : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (Volatile.Read(ref _pending) != 0) throw new InvalidOperationException("Cannot reset a busy runspace.");
-        _previous = null; _states = new object[16]; _states[0] = _globals; _submissions = 0;
+        _wire.Dispose(); _previous = null; _states = new object[16]; _states[0] = _globals; _submissions = 0;
         // Loaded assemblies cannot be unloaded in browser-wasm. Terminate the worker to reclaim them.
     }
     public void Dispose()
     {
         if (_disposed) return;
         if (Volatile.Read(ref _pending) != 0) throw new InvalidOperationException("Cannot dispose a busy runspace.");
-        _disposed = true; AppDomain.CurrentDomain.AssemblyResolve -= ResolveAssembly;
+        _wire.Dispose(); _disposed = true; AppDomain.CurrentDomain.AssemblyResolve -= ResolveAssembly;
         _assemblies.Clear(); _states = []; _previous = null; _ownedNugetClient?.Dispose();
     }
     internal sealed class BoundedWriter : StringWriter

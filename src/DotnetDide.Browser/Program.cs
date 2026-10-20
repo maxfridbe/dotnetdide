@@ -12,7 +12,7 @@ public static partial class RuntimeBridge
     private static Runspace Current => _runspace ?? throw new InvalidOperationException("Initialize the runtime first.");
 
     [JSExport]
-    public static async Task<string> Initialize(string[] assemblyUrls, bool nugetAccess)
+    public static async Task<string> Initialize(string[] assemblyUrls, bool nugetAccess, bool siteAccess)
     {
         if (_runspace is not null) throw new InvalidOperationException("Runtime already initialized.");
         using var http = new HttpClient();
@@ -23,11 +23,14 @@ public static partial class RuntimeBridge
             var bytes = await http.GetByteArrayAsync(url);
             references.Add(MetadataReference.CreateFromImage(bytes));
         }
-        _runspace = new(new WorkspaceFileSystem("/home/dotnetdide"), references, nugetAccess);
+        _runspace = new(new WorkspaceFileSystem("/home/dotnetdide"), references, nugetAccess, siteAccess: siteAccess);
         return Environment.Version.ToString();
     }
 
     [JSExport] public static async Task<string> Run(string code) => JsonSerializer.Serialize(await Current.RunAsync(code), Json);
+    [JSExport] public static void SetSiteAccess(bool enabled) => Current.SetSiteAccess(enabled);
+    [JSExport] public static string Sites() => JsonSerializer.Serialize(Current.WireSites, Json);
+    [JSExport] public static async Task<string> Request(string request) => JsonSerializer.Serialize(await Current.RequestAsync(JsonSerializer.Deserialize<WireRequest>(request, Json) ?? throw new ArgumentException("Missing request.")), Json);
     [JSExport] public static void SetNugetAccess(bool enabled) => Current.SetNugetAccess(enabled);
     [JSExport] public static void Reset() => Current.Reset();
 

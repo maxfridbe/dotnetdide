@@ -6,3 +6,10 @@
 @media(prefers-reduced-motion:reduce){#status[data-state=busy]::before{animation:none}}
 
 #monaco{height:330px;min-height:220px;max-height:75vh;resize:vertical;overflow:hidden;border:1px solid var(--border);border-radius:7px}#code[hidden],#monaco[hidden]{display:none}#code-editor{min-width:0}#editor-state{margin-top:8px}
+
+.site-panel { background: var(--panel, #151b2a); border: 1px solid #34405a; border-radius: 16px; padding: 20px; }
+.site-panel iframe { width:100%; height:420px; border:1px solid #34405a; background:white; border-radius:8px; }
+.site-panel .toolbar { flex-wrap:wrap; }
+.site-panel label { display:flex; flex-direction:column; gap:6px; max-width:100%; }
+.site-panel input,.site-panel select { max-width:100%; font:inherit; padding:6px; }
+#site-status { overflow-wrap:anywhere; }

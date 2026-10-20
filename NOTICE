@@ -28,3 +28,9 @@ NuGet.Versioning 7.9.0 (Apache-2.0). See docs/licenses for upstream notices;
 Microsoft System.* dependencies use their respective .NET licenses.
 Packages downloaded at runtime have their own licenses and are not part of this
 bundled distribution.
+
+ASP.NET Core managed middleware, routing and IServer assemblies are copied from
+the pinned SDK's Microsoft.AspNetCore.App 11.0.0-rc.2.26504.105 shared runtime
+(Microsoft/.NET Foundation, MIT). build/aspnet.props records the exact assembly
+set. Kestrel/native hosting and the full ASP.NET runtime pack are not included.
+See docs/licenses/aspnetcore.txt.

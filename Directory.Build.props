@@ -2,4 +2,4 @@
   <TargetFramework>net11.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
   <LangVersion>preview</LangVersion><TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-</PropertyGroup></Project>
+</PropertyGroup><Import Project="build/aspnet.props" Condition="'$(MSBuildProjectName)' == 'DotnetDide.Core' Or '$(MSBuildProjectName)' == 'DotnetDide.Browser' Or '$(MSBuildProjectName)' == 'DotnetDide.Core.Tests'" /></Project>

@@ -196,3 +196,18 @@ network fallback if caching is unavailable. They are not included in session sna
 See [media and package guide](docs/media-and-packages.md) and [llm.md](llm.md) for
 complete code examples, result types, version/dependency resolution, unsupported
 packages and permission behavior. Serve the bundled guides alongside the SDK.
+
+## Interactive ASP.NET sites
+
+Pass `siteAccess: true` to `loadDotnetdide` to enable virtual servers. The default
+is false. `setSiteAccess(false)` stops them, `listSites()` lists ports, and
+`requestSite({port, method, path, headers, body}, {signal, timeoutMs})` dispatches
+buffered HTTP to C# (body is base64). Calls share the runtime queue.
+
+Use `createWirePreview({iframe, port, path, request})` for interactive HTML. Keep
+`wire-preview.js` and `wire-preview-host.html` beside the runtime. The helper
+uses an opaque sandbox with script/form events; the parent must restrict iframe
+navigation with `frame-src 'self'`. Its separate document CSP allows generated
+code without relaxing the parent script policy. Export session files after mutating
+requests. See [Wire guide](docs/wire.md) for the complete runnable example, lifecycle,
+request limits and supported browser features.

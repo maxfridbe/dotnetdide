@@ -284,3 +284,36 @@ Do not request NuGet access for the bundled media libraries.
 Read [media and package guide](docs/media-and-packages.md) for complete runnable
 image/audio examples, permissions, cache clearing, limits and compatibility.
 The release includes `examples/images.cs` and `examples/audio.cs` in wwwroot.
+
+## Interactive sites: ASP.NET IServer
+
+The bundled `DotnetDide.Wire` supports virtual HTTP ports in the current runspace.
+The host must enable `siteAccess` (off by default); Network/NuGet are separate.
+Add explicit usings for `DotnetDide`, `Microsoft.AspNetCore.Builder` and
+`Microsoft.AspNetCore.Http`. `Microsoft.AspNetCore.Routing`, `.Http.Features`,
+`.Hosting.Server`, `.Hosting.Server.Features` and `Microsoft.Extensions.DependencyInjection`
+are also available. These are **not** added to the default using list.
+
+Use `Wire.CreateApplication()`, middleware, `UseRouting()` and `UseEndpoints` with
+`MapGet`/`MapPost` **async HttpContext handlers**. Await
+`Wire.ListenAsync(8080, app, "site")`, then return; the host retains the server.
+Do not use blocking host Run/WaitForShutdown or infinite loops. For JSON, set
+ContentType and `await context.Response.WriteAsync(JsonSerializer.Serialize(value))`;
+.NET 11 RC2 WASM fails for the tested automatic object-result/WriteAsJsonAsync path.
+
+Write a reusable .cs program with these explicit usings; run with
+`await Dotnet.Run("Site.cs")`, or create a `Microsoft.NET.Sdk` executable csproj and
+run its path. Do not add FrameworkReference or use Sdk.Web. Static `webRoot` and
+handler working directory are captured relative to the registering program.
+`Wire.Stop(port)` removes it before rerunning; reset/reload stops every site.
+
+The user can interact through the host's Sites preview and download request-created
+files. Lethetic also offers Run in Files and saves changes after each request.
+Use classic JS and fetch to local paths, not ES modules, XHR or WebSockets. For
+forms, preventDefault and fetch POST. No cookies, external preview networking or
+parent UI/storage access. Outbound C# HTTP remains separately permissioned.
+
+Read [the complete Wire guide](docs/wire.md) and the executable
+[notebook sample](https://github.com/maxfridbe/dotnetdide/blob/master/src/DotnetDide.Browser/wwwroot/examples/site.cs) before generating a site. They cover .cs and
+.csproj creation, compilation, static files, JSON, embedding and limits. In the
+repository the executable sample is at `src/DotnetDide.Browser/wwwroot/examples/site.cs`.

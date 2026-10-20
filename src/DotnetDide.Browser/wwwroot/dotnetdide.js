@@ -1,10 +1,12 @@
+export { createWirePreview } from './wire-preview.js';
 export { clearNugetCache } from './package-cache.js';
 import { validateRelay } from './relay-fetch.js';
 
 /** Load one isolated .NET 11 runspace. All compilation and file operations run in .NET. */
-export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networkAccess = false, nugetAccess = false, relay = null } = {}) {
+export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networkAccess = false, nugetAccess = false, siteAccess = false, relay = null } = {}) {
   if (typeof networkAccess !== 'boolean') throw new TypeError('networkAccess must be a boolean.');
   if (typeof nugetAccess !== 'boolean') throw new TypeError('nugetAccess must be a boolean.');
+  if (typeof siteAccess !== 'boolean') throw new TypeError('siteAccess must be a boolean.');
   relay = validateRelay(relay);
   const worker = new Worker(new URL('./dotnetdide.worker.js', import.meta.url), { type: 'module', name: 'dotnetdide' });
   const pending = new Map();
@@ -42,7 +44,7 @@ export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networ
   }
   const files = (op, values = {}) => request('files', { op, ...values });
   let version;
-  try { version = await request('initialize', { networkAccess, nugetAccess, relay }, { signal, timeoutMs: startupTimeoutMs }); }
+  try { version = await request('initialize', { networkAccess, nugetAccess, siteAccess, relay }, { signal, timeoutMs: startupTimeoutMs }); }
   catch (error) { terminate(error); throw error; }
   return {
     version,
@@ -58,6 +60,12 @@ export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networ
       if (typeof enabled !== 'boolean') return Promise.reject(new TypeError('nugetAccess must be a boolean.'));
       return request('nuget', enabled);
     },
+    setSiteAccess(enabled) {
+      if (typeof enabled !== 'boolean') return Promise.reject(new TypeError('siteAccess must be a boolean.'));
+      return request('site-access', enabled);
+    },
+    listSites: () => request('sites'),
+    requestSite: (value, options = {}) => request('site-request', value, { timeoutMs: 20000, ...options }),
     reset: () => request('reset'),
     terminate,
     exportWorkspace: () => files('export'),
