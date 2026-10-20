@@ -39,6 +39,40 @@ is rejected without destroying a healthy worker. To resume after termination,
 load a new worker and import a previously exported snapshot. Code is never replayed
 automatically. There is no transparent cancellation-and-continue guarantee.
 
+## Diagnostics and Console capture
+
+Every loaded runspace owns a bounded diagnostics store. `runtime.GetDebugInfo()`
+(or `runtime.getDebugInfo()`) returns a detached JSON-compatible object containing
+`version`, `network`, `console`, `assemblies`, `assemblyScope`, and eviction counts in `dropped`. `runtime.listAssemblies()` explicitly refreshes the loaded assembly snapshot. Reading `GetDebugInfo()` is
+synchronous and works after `terminate()`. `runtime.clearDebugInfo()` clears both
+logs. Subscribe with `runtime.onDebugInfoChanged(callback)`; the returned function
+unsubscribes. Observer failures do not affect the program.
+
+`requestSite` records virtual HTTP automatically. `runCSharpAsync` records stdout,
+stderr, compiler diagnostics and runtime errors. Site responses also include
+`stdout` and `stderr` from their C# handler, including Wire's synchronous ILogger
+provider. Connect hosted iframe logging explicitly:
+
+```js
+const preview = await createWirePreview({
+  iframe, port: 8080, request: value => runtime.requestSite(value),
+  onConsole: runtime.recordConsole,
+});
+const diagnostics = runtime.GetDebugInfo();
+```
+
+The preview sends bounded console/error messages over its private MessageChannel;
+its origin remains opaque. It buffers early page logs, captures uncaught errors
+and rejected promises, and stops forwarding on navigation/destruction. No parent
+console monkey-patching or same-origin sandbox permission is required.
+
+Pass `diagnostics: new DebugInfoStore()` to `loadDotnetdide` to share the store with
+`new VirtualNetworkDebugger(changed, store)`. Do not additionally wrap requestSite
+with `trace()` in that arrangement, or each request will be recorded twice.
+`debugScope` labels a runtime's entries. The default store has 500 console entries
+and 200 Wire requests; see [the LLM debugging guide](llm.md#debug-your-own-application)
+for the schema, snapshot timing, limits and C# `Dotnet.GetDebugInfo()` usage.
+
 ## Shared filesystem
 
 The `.NET browser-wasm` runtime provides the in-memory filesystem. `System.IO`
@@ -225,3 +259,27 @@ wrapped method to `createWirePreview` to include iframe requests. The host owns
 the patch loop, layout and runtime permissions. See [component setup and log
 limits](docs/playground.md#reuse-the-snabbdom-component). No Node.js is needed
 when embedding the published modules.
+
+## JavaScript LoadNuget example
+
+```js
+import {loadDotnetdide} from './dotnetdide.js';
+const DotnetDide = await loadDotnetdide({nugetAccess: true, networkAccess: false});
+const loaded = await DotnetDide.LoadNuget("Newtonsoft.Json", "13.0.4");
+console.log(loaded.name, loaded.version, loaded.packages);
+// Use the package only in a subsequent submission, after loading completes.
+const result = await DotnetDide.runCSharpAsync(
+  'Newtonsoft.Json.JsonConvert.SerializeObject(new { answer = 42 })');
+console.log(result.value); // {"answer":42}
+// DotnetDide.terminate() when finished.
+```
+
+`DotnetDide` above is the JavaScript runspace variable, not a C# namespace method.
+Inside C# submissions use `await DotnetDide.Nuget.Load("Newtonsoft.Json", "13.0.4")`
+in step 1, then reference the package's types in step 2. The playground's **Load a
+NuGet package** example demonstrates those two steps. Enable **NuGet downloads**
+first; Run all checks skips this example while that permission is off. Downloads
+use the browser and existing bounded Cache Storage, not localStorage. General
+network access is independent. `LoadNuget` rejects when permission is disabled or
+a package is incompatible; it does not silently grant permission. Already bundled
+image/audio defaults remain available without downloading them.

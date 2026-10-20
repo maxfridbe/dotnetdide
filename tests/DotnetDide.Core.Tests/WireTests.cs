@@ -14,6 +14,30 @@ public sealed class WireTests : IDisposable
         Assert.True(result.Success, string.Join("\n", result.Diagnostics.Select(d => d.Message)) + result.Error);
     }
     [Fact]
+    public async Task SiteOutputAndHostDebugSnapshotAreAvailable()
+    {
+        using var runspace = new Runspace(new WorkspaceFileSystem(_root), References, siteAccess: true,
+            getDebugInfo: () => "{\"version\":1,\"console\":[\"iframe log\"]}");
+        var snapshot = await runspace.RunAsync("Dotnet.GetDebugInfo()");
+        Assert.True(snapshot.Success); Assert.Contains("iframe log", snapshot.Value);
+        await Run(runspace, """
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            var app = DotnetDide.Wire.CreateApplication();
+            app.Run(async context => {
+                Console.WriteLine("handler output"); Console.Error.WriteLine("handler error");
+                var logger = (Microsoft.Extensions.Logging.ILoggerFactory)app.ApplicationServices.GetService(typeof(Microsoft.Extensions.Logging.ILoggerFactory))!;
+                Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(logger.CreateLogger("demo"), "logger warning");
+                await context.Response.WriteAsync("ok");
+            });
+            await DotnetDide.Wire.ListenAsync(8080, app);
+            """);
+        var response = await runspace.RequestAsync(new(8080, "GET", "/"));
+        Assert.Equal(200, response.Status);
+        Assert.Contains("handler output", response.Stdout); Assert.Contains("handler error", response.Stderr); Assert.Contains("logger warning", response.Stderr);
+    }
+
+    [Fact]
     public async Task AspNetMiddlewareRoutesAndSessionFilesWorkWithoutSockets()
     {
         using var runspace = Create();

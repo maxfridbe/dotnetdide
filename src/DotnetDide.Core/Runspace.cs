@@ -24,7 +24,7 @@ public sealed class Runspace : IDisposable
     private bool _disposed;
     public WorkspaceFileSystem Files { get; }
 
-    public Runspace(WorkspaceFileSystem files, IEnumerable<MetadataReference> references, bool nugetAccess = false, HttpClient? nugetClient = null, bool siteAccess = false)
+    public Runspace(WorkspaceFileSystem files, IEnumerable<MetadataReference> references, bool nugetAccess = false, HttpClient? nugetClient = null, bool siteAccess = false, Func<string>? getDebugInfo = null)
     {
         Files = files; _references = references.ToList();
         _wire = new(files) { Enabled = siteAccess };
@@ -39,7 +39,7 @@ public sealed class Runspace : IDisposable
             }
             _references.AddRange(metadata);
         }) { Enabled = nugetAccess };
-        _globals = new(new DotnetCommands(Files, _references, assembly => _assemblies[assembly.GetName().Name!] = assembly));
+        _globals = new(new DotnetCommands(Files, _references, assembly => _assemblies[assembly.GetName().Name!] = assembly, getDebugInfo));
         _states[0] = _globals;
         AppDomain.CurrentDomain.AssemblyResolve += ResolveAssembly;
     }
@@ -113,7 +113,8 @@ public sealed class Runspace : IDisposable
             {
                 Directory.SetCurrentDirectory(Files.RootPath); Console.SetOut(output); Console.SetError(errors);
                 Wire.Current.Value = _wire; Nuget.Current.Value = _packages;
-                return await _wire.RequestAsync(request, cancellationToken);
+                var response = await _wire.RequestAsync(request, cancellationToken);
+                return response with { Stdout = output.ToString(), Stderr = errors.ToString() };
             }
             finally { Directory.SetCurrentDirectory(previous); Console.SetOut(stdout); Console.SetError(stderr); Wire.Current.Value = null; Nuget.Current.Value = null; }
         }

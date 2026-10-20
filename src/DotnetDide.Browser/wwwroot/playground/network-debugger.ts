@@ -1,5 +1,8 @@
 import { h, download, fileSize } from "./vdom.js";
 import type { VNode } from "./vdom.js";
+import {DebugInfoStore} from "./debug-info.js";
+import {AssembliesPanel} from "./assemblies-panel.js";
+import {ConsolePanel} from "./console-panel.js";
 import { VirtualNetworkLog } from "./network-log.js";
 import type { BodyPreview, NetworkEntry } from "./network-log.js";
 import type { WireRequest, WireResponse } from "../dotnetdide.js";
@@ -12,6 +15,10 @@ const elapsed = (value: number): string => value < 1000 ? `${value.toFixed(1)} m
  */
 export class VirtualNetworkDebugger {
   readonly log: VirtualNetworkLog;
+  readonly consolePanel: ConsolePanel;
+  readonly assembliesPanel: AssembliesPanel;
+  panel: "Network" | "Console" | "Assemblies" = "Network";
+  #unsubscribe: () => void;
   open = true;
   dock: "bottom" | "right" = "bottom";
   height = 310;
@@ -22,13 +29,18 @@ export class VirtualNetworkDebugger {
   tab: DetailTab = "Headers";
   message = "";
   #resizeCleanup: (() => void) | null = null;
-  constructor(private readonly changed: () => void) { this.log = new VirtualNetworkLog(changed); }
+  constructor(private readonly changed: () => void, readonly diagnostics = new DebugInfoStore()) {
+    this.log = diagnostics.network;
+    this.consolePanel = new ConsolePanel(diagnostics, changed);
+    this.assembliesPanel = new AssembliesPanel(diagnostics, changed);
+    this.#unsubscribe = diagnostics.subscribe(changed);
+  }
   get layoutDock(): "bottom" | "right" { return innerWidth < 800 ? "bottom" : this.dock; }
   trace(request: WireRequest, invoke: () => Promise<WireResponse>, scope?: string): Promise<WireResponse> {
     return this.log.trace(request, invoke, scope);
   }
   toggle(): void { this.open = !this.open; this.changed(); }
-  dispose(): void { this.#resizeCleanup?.(); }
+  dispose(): void { this.#resizeCleanup?.(); this.#unsubscribe(); }
   private clear(): void { this.selected = null; this.log.clear(); this.message = ""; this.changed(); }
   private resize(event: PointerEvent): void {
     if (event.button !== 0) return;
@@ -119,7 +131,7 @@ export class VirtualNetworkDebugger {
       if (next) { select(next); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-network-id="${next.id}"] button`)?.focus()); }
     };
     return h("section#virtual-debugger.virtual-debugger", {
-      attrs: {"aria-label": "Virtual network debugger", hidden: !this.open, "data-dock": this.layoutDock},
+      attrs: {"aria-label": "Virtual debugger", hidden: !this.open, "data-dock": this.layoutDock},
       style: {height: this.layoutDock === "bottom" ? `${this.height}px` : "100%", width: this.layoutDock === "right" ? `${this.width}px` : "100%"},
     }, [
       h("div.network-resizer", {attrs: {role: "separator", tabindex: "0", "aria-label": "Resize virtual debugger",
@@ -128,13 +140,17 @@ export class VirtualNetworkDebugger {
         "aria-valuenow": String(Math.round(this.layoutDock === "bottom" ? this.height : this.width))},
         on: {pointerdown: event => this.resize(event as PointerEvent), keydown: event => this.resizeKey(event as KeyboardEvent)}}),
       h("header.network-titlebar", [
-        h("strong", "Virtual DevTools"), h("span.network-active-tab", "Network"),
-        h("span.network-title-note", "Wire · local HTTP"),
+        h("strong", "Virtual DevTools"),
+        h("div.debugger-tabs", {attrs: {role: "tablist", "aria-label": "Debugger panels"}},
+          (["Network", "Console", "Assemblies"] as const).map(panel => h("button", {class: {"network-active-tab": this.panel === panel},
+            attrs: {type: "button", role: "tab", "aria-selected": String(this.panel === panel), "data-debugger-tab": panel},
+            on: {click: () => { this.panel = panel; this.changed(); }}}, panel))),
+        h("span.network-title-note", this.panel === "Network" ? "Wire · local HTTP" : this.panel === "Console" ? "Runtime · iframe" : "Loaded .NET"),
         h("button", {attrs: {type: "button", "data-network-action": "dock", "aria-label": "Toggle debugger dock", title: "Dock bottom / right", disabled: innerWidth < 800},
           on: {click: () => { this.dock = this.dock === "bottom" ? "right" : "bottom"; this.changed(); }}}, this.layoutDock === "bottom" ? "◨" : "⬒"),
         h("button", {attrs: {type: "button", "data-network-action": "close", "aria-label": "Close virtual debugger"}, on: {click: () => this.toggle()}}, "×"),
       ]),
-      h("div.network-toolbar", [
+      ...(this.panel === "Console" ? this.consolePanel.view() : this.panel === "Assemblies" ? this.assembliesPanel.view() : [h("div.network-toolbar", [
         h("button.network-record", {class: {recording: this.log.recording}, attrs: {type: "button", "aria-label": "Record virtual requests", "aria-pressed": String(this.log.recording), "data-network-action": "record"},
           on: {click: () => { this.log.recording = !this.log.recording; this.changed(); }}}, "●"),
         h("button", {attrs: {type: "button", title: "Clear requests", "aria-label": "Clear requests", "data-network-action": "clear"}, on: {click: () => this.clear()}}, "⊘"),
@@ -171,6 +187,7 @@ export class VirtualNetworkDebugger {
       h("footer.network-footer", [
         h("span", `${entries.length} / ${this.log.entries.length} requests · ${fileSize(entries.reduce((sum, entry) => sum + (entry.responseBody?.bytes ?? 0), 0))} received${this.log.dropped ? ` · ${this.log.dropped} older requests evicted` : ""}`),
         h("span", {attrs: {role: "status"}}, this.message || "Memory only · Headers redacted · Body previews limited to 16 KiB"),
+      ]),
       ]),
     ]);
   }

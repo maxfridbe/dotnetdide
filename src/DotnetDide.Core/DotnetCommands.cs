@@ -32,8 +32,12 @@ public sealed class DotnetCommands
     private readonly WorkspaceFileSystem _files;
     private readonly IReadOnlyList<MetadataReference> _references;
     private readonly Action<Assembly> _register;
-    internal DotnetCommands(WorkspaceFileSystem files, IReadOnlyList<MetadataReference> references, Action<Assembly> register)
-    { _files = files; _references = references; _register = register; }
+    private readonly Func<string>? _getDebugInfo;
+    internal DotnetCommands(WorkspaceFileSystem files, IReadOnlyList<MetadataReference> references, Action<Assembly> register, Func<string>? getDebugInfo = null)
+    { _files = files; _references = references; _register = register; _getDebugInfo = getDebugInfo; }
+
+    /// <summary>Host diagnostics JSON captured when this submission was requested.</summary>
+    public string GetDebugInfo() => _getDebugInfo?.Invoke() ?? throw new NotSupportedException("This host does not provide debug snapshots.");
 
     public BuildResult Build(string? path = null)
     {

@@ -1,9 +1,11 @@
 # dotnetdide
 
 **[Try it now — C# playground](https://maxfridbe.github.io/dotnetdide/)** ·
-Editable examples, downloadable files, real browser checks and a virtual Network debugger.
+Editable examples, downloadable files, real browser checks and virtual Network / Console / Assemblies DevTools.
 
 [![dotnetdide browser playground](docs/images/playground.png)](https://maxfridbe.github.io/dotnetdide/)
+
+[Console screenshot](docs/images/console-debugger.png) · [Assemblies screenshot](docs/images/assemblies-debugger.png) · [Debugger guide](docs/playground.md)
 
 A .NET 11 browser runspace with persistent C# submissions and a shared virtual
 filesystem, inspired by [WasmSharp](https://github.com/JakeYallop/WasmSharp).
@@ -27,7 +29,10 @@ browser JavaScript.
 - Build workspace C# files and supported SDK-style projects into downloadable DLL/PDB files.
 - Run compiled programs with arguments, async entry points, build logs and captured output.
 - Host ASP.NET Core middleware/routes on virtual ports with `DotnetDide.Wire` and an isolated interactive iframe.
-- Inspect virtual HTTP requests in a reusable Snabbdom Network debugger: payloads, responses, timings, filtering and export.
+- Inspect virtual HTTP requests and C#/iframe console output in reusable Snabbdom DevTools: filtering, stack traces and JSON export.
+- Load compatible managed NuGet packages with permission-gated JavaScript `runtime.LoadNuget(name, version)` or C# `DotnetDide.Nuget.Load(name, version)`.
+- Inspect loaded .NET assembly names and versions, including downloaded NuGet assemblies.
+- Debug your own application with JavaScript `runtime.GetDebugInfo()` or C# submission `Dotnet.GetDebugInfo()`; see [the debugging recipe](llm.md#debug-your-own-application).
 
 ## Build and run saved C# programs
 

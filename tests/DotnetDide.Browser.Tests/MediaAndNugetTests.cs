@@ -51,8 +51,13 @@ public sealed class MediaAndNugetTests
               if (denied.success || !denied.error?.message.includes('disabled')) throw Error('NuGet was not denied');
               await packages.runCSharpAsync('int kept = 42; File.WriteAllText("kept.txt", "saved");');
               await packages.setNugetAccess(true);
-              const loaded = await packages.runCSharpAsync('await DotnetDide.Nuget.Load("Newtonsoft.Json", "13.0.4")');
-              if (!loaded.success) throw Error(JSON.stringify(loaded));
+              const loaded = await packages.LoadNuget('Newtonsoft.Json', '13.0.4');
+              if (loaded.name !== 'Newtonsoft.Json' || loaded.version !== '13.0.4' || !loaded.packages.length) throw Error(JSON.stringify(loaded));
+              if (!packages.GetDebugInfo().assemblies.some(item=>item.name==='Newtonsoft.Json')) throw Error('Loaded NuGet assembly missing from debugger');
+              const example = (await import('./playground/examples.js')).examples.find(example => example.id === 'nuget');
+              const exampleResults = [];
+              for (const step of example.steps) exampleResults.push(await packages.runCSharpAsync(step));
+              if (!exampleResults.every(result => result.success) || !await example.verify(exampleResults, packages)) throw Error('NuGet playground example failed');
               const serialized = await packages.runCSharpAsync('Newtonsoft.Json.JsonConvert.SerializeObject(new { answer = kept })');
               if (!serialized.success || serialized.value !== '{"answer":42}') throw Error(JSON.stringify(serialized));
               await packages.FS.writeFile('Program.cs', 'using Newtonsoft.Json; Console.Write(JsonConvert.SerializeObject(new { answer = 42 }));');
@@ -61,6 +66,8 @@ public sealed class MediaAndNugetTests
               const network = await packages.runCSharpAsync('await new System.Net.Http.HttpClient().GetStringAsync(' + JSON.stringify(location.origin + '/network-probe') + ')');
               if (network.success) throw Error('NuGet permission enabled general network');
               await packages.setNugetAccess(false);
+              let aliasDenied=false;try{await packages.LoadNuget('Newtonsoft.Json','13.0.4')}catch(error){aliasDenied=error.message.includes('disabled')}
+              if(!aliasDenied)throw Error('JavaScript NuGet API bypassed permission');
               const revoked = await packages.runCSharpAsync('await DotnetDide.Nuget.Load("Newtonsoft.Json", "13.0.4")');
               if (revoked.success) throw Error('NuGet permission was not revoked');
               return {kept:(await packages.runCSharpAsync('kept')).value,file:await packages.FS.readFile('kept.txt',{encoding:'utf8'})};

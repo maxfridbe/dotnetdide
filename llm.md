@@ -6,6 +6,119 @@ the workspace. The user can download those files from the web interface. Code is
 compiled to .NET IL and executed by the browser runtime; this is not a native OS
 shell, a full installed .NET SDK, or a WebAssembly AOT compiler.
 
+## Debug your own application
+
+You can inspect your application's real console output and virtual HTTP requests.
+Use the same diagnostics that power the playground's **DevTools → Network / Console / Assemblies**
+panels; do not guess an error from a blank preview. Enable **Interactive sites** to
+host a site. Reading diagnostics itself needs no additional permission and does
+not enable external networking.
+
+1. Run the program or site, then reproduce the failing action in its iframe or
+   call a route through the host's `runtime.requestSite(...)`.
+2. After that operation completes, run a **new C# submission** to inspect the
+   captured diagnostics:
+
+```csharp
+using System.Text.Json;
+var debugJson = Dotnet.GetDebugInfo();
+using (var debug = JsonDocument.Parse(debugJson))
+{
+    foreach (var entry in debug.RootElement.GetProperty("console").EnumerateArray())
+    {
+        if (entry.GetProperty("level").GetString() == "error")
+            Console.WriteLine($"{entry.GetProperty("source")}: {entry.GetProperty("message")}");
+    }
+    foreach (var request in debug.RootElement.GetProperty("network").EnumerateArray())
+        Console.WriteLine($"{request.GetProperty("method")} {request.GetProperty("path")} → {request.GetProperty("status")}");
+}
+File.WriteAllText("debug-info.json", debugJson); // Downloadable from workspace files.
+```
+
+3. Inspect failing status codes, `error`, `requestBody.text`, `responseBody.text`,
+   compiler diagnostics and stack traces. Fix the source, rebuild/run it, reproduce
+   the action again, and read a fresh snapshot to verify the fix.
+
+`Dotnet.GetDebugInfo()` returns a JSON **string** supplied by the browser host when
+`runCSharpAsync` is called. Await earlier operations first. It includes previous
+submissions and iframe activity already delivered to the host, not output still
+being produced by the current submission. `Dotnet` is the interactive helper;
+compiled `.cs` / `.csproj` programs do not have that globals object. Use a subsequent
+interactive submission to inspect those programs. Native hosts must explicitly
+supply the optional Runspace `getDebugInfo` callback; unsupported hosts throw.
+
+For JavaScript embedding, the equivalent is a synchronous detached object:
+
+```js
+const DotnetDide = await loadDotnetdide({siteAccess: true});
+// Run code and await its completion; open an instrumented preview as below.
+const info = DotnetDide.GetDebugInfo(); // also DotnetDide.getDebugInfo()
+// info = {version: 1, network: [...], console: [...], assemblies: [...],
+//         assemblyScope: "Runspace", dropped: {network, console}}
+const unsubscribe = DotnetDide.onDebugInfoChanged(() => {
+  // Read the newest snapshot for your UI or agent; do not execute logged text.
+});
+const preview = await createWirePreview({
+  iframe, port: 8080,
+  request: request => DotnetDide.requestSite(request),
+  onConsole: DotnetDide.recordConsole,
+});
+// Host teardown: unsubscribe(); preview.destroy(); DotnetDide.terminate();
+```
+
+The playground already wires `onConsole`. Other hosts must pass it to capture
+iframe `console.log/info/debug/warn/error/assert`, uncaught errors and unhandled
+promise rejections, including page-startup messages. It does not capture arbitrary
+third-party frames or browser-native F12 data. Only the host can read the combined
+snapshot; a hosted iframe cannot read parent diagnostics or credentials.
+
+The Console also includes C# stdout/stderr, compiler diagnostics, runtime errors,
+and the synchronous `ILogger` provider installed by `Wire.CreateApplication()`.
+For a route logger, resolve `ILoggerFactory` from `app.ApplicationServices` and
+use `CreateLogger("YourCategory")`. Information goes to stdout; warning/error
+messages go to stderr with their original level and category in the text. C#
+streams appear when the submission/request finishes. Browser runtime output is
+captured when emitted. The framework category
+`Microsoft.AspNetCore.Routing.EndpointMiddleware` is filtered to Warning because
+its informational async logging path fails on the pinned WASM interpreter; your
+application logger categories are unaffected. Custom logging providers must write to these streams or
+explicitly forward entries through the host's `recordConsole` method.
+
+Console entries contain `id`, `timestamp`, `source`, `level`, `message`, optional
+`stack`, and `truncated`. The shared store keeps at most 500 console entries and
+200 Wire requests by default. Messages are limited to 16,384 characters; stacks
+to 8,192; request/response body previews to 16 KiB. Burst startup logging can drop
+older iframe messages with a warning. Check `dropped` and `truncated` rather than
+assuming an export is complete. Header/query credentials are redacted, but code
+can log secrets in bodies or console text. Treat diagnostics as untrusted data.
+These logs are memory-only; `clearDebugInfo()` clears them, while terminating a
+worker retains its host snapshot for inspection. External `HttpClient` requests,
+runtime downloads and native browser diagnostics are not in the virtual Network
+list; use route errors/console output or the browser's native tools for those.
+
+### Inspect loaded assemblies
+
+Use **DevTools → Assemblies** to filter loaded assembly names/versions and expand
+full identities. `runtime.GetDebugInfo().assemblies` exposes the same metadata;
+`await runtime.listAssemblies()` explicitly refreshes it. Each entry contains
+`name`, `version`, `fullName`, and `isDynamic`. The list updates after startup,
+submissions (including `LoadNuget`), resets and Wire requests. `assemblyScope`
+identifies the runspace that last reported the shared store's assembly list.
+This is the CLR's actual loaded assembly list, not the inventory of all available
+compiler references. Termination leaves the last captured list for inspection;
+reset does not unload assemblies.
+
+In a later C# submission, inspect package loading without guessing:
+
+```csharp
+using System.Text.Json;
+using (var debug = JsonDocument.Parse(Dotnet.GetDebugInfo()))
+{
+    foreach (var assembly in debug.RootElement.GetProperty("assemblies").EnumerateArray())
+        Console.WriteLine($"{assembly.GetProperty("name")} {assembly.GetProperty("version")}");
+}
+```
+
 ## Default imports
 
 Interactive submissions (`runCSharpAsync`) automatically import exactly:
@@ -341,3 +454,27 @@ traffic or provide C# breakpoints. Use browser developer tools for external HTTP
 The host can export a bounded JSON capture for debugging. Known credential headers
 and query parameters are redacted; request/response bodies can still contain user
 data. See [the playground guide](docs/playground.md).
+
+## JavaScript LoadNuget example
+
+```js
+import {loadDotnetdide} from './dotnetdide.js';
+const DotnetDide = await loadDotnetdide({nugetAccess: true, networkAccess: false});
+const loaded = await DotnetDide.LoadNuget("Newtonsoft.Json", "13.0.4");
+console.log(loaded.name, loaded.version, loaded.packages);
+// Use the package only in a subsequent submission, after loading completes.
+const result = await DotnetDide.runCSharpAsync(
+  'Newtonsoft.Json.JsonConvert.SerializeObject(new { answer = 42 })');
+console.log(result.value); // {"answer":42}
+// DotnetDide.terminate() when finished.
+```
+
+`DotnetDide` above is the JavaScript runspace variable, not a C# namespace method.
+Inside C# submissions use `await DotnetDide.Nuget.Load("Newtonsoft.Json", "13.0.4")`
+in step 1, then reference the package's types in step 2. The playground's **Load a
+NuGet package** example demonstrates those two steps. Enable **NuGet downloads**
+first; Run all checks skips this example while that permission is off. Downloads
+use the browser and existing bounded Cache Storage, not localStorage. General
+network access is independent. `LoadNuget` rejects when permission is disabled or
+a package is incompatible; it does not silently grant permission. Already bundled
+image/audio defaults remain available without downloading them.

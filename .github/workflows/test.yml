@@ -102,9 +102,11 @@ jobs:
           RELEASE_COMMIT: ${{ github.sha }}
         run: |
           cat > release-notes.md <<'NOTES'
-          Tested .NET 11 browser runspace and TypeScript/Snabbdom playground with Monaco and a virtual Network debugger, ready for static hosting or embedding.
+          Tested .NET 11 browser runspace and TypeScript/Snabbdom playground with Monaco and virtual Network, Console and Assemblies DevTools, ready for static hosting or embedding.
 
           Download the versioned ZIP and verify its SHA-256 checksum. Extract it and serve `wwwroot/` over HTTPS or localhost. The archive includes the runtime, editor assets, examples, the optional native .NET HTTP/SOCKS5 relay in `relay/`, `integration.md`, `llm.md`, library inventories and license notices.
+
+          The shared GetDebugInfo API exposes network, console and loaded-assembly snapshots to host JavaScript and C# submissions. The Console component captures runtime output, ILogger messages and hosted iframe logs/errors. See llm.md for self-debugging examples.
 
           The reusable Snabbdom virtual Network component captures Wire requests with headers, payloads, response previews, timings, filtering and JSON export. The archive includes its compiled ES modules, type declarations, source maps and docs/playground.md. No Node.js is required to build or use it.
 

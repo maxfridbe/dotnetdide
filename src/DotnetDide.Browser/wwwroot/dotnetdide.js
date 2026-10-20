@@ -1,13 +1,21 @@
 export { createWirePreview } from './wire-preview.js';
 export { clearNugetCache } from './package-cache.js';
+export { DebugInfoStore } from './playground/debug-info.js';
+import { DebugInfoStore } from './playground/debug-info.js';
 import { validateRelay } from './relay-fetch.js';
 
 /** Load one isolated .NET 11 runspace. All compilation and file operations run in .NET. */
-export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networkAccess = false, nugetAccess = false, siteAccess = false, relay = null } = {}) {
+export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networkAccess = false, nugetAccess = false, siteAccess = false, relay = null, diagnostics = new DebugInfoStore(), debugScope = "Runspace" } = {}) {
   if (typeof networkAccess !== 'boolean') throw new TypeError('networkAccess must be a boolean.');
   if (typeof nugetAccess !== 'boolean') throw new TypeError('nugetAccess must be a boolean.');
   if (typeof siteAccess !== 'boolean') throw new TypeError('siteAccess must be a boolean.');
   relay = validateRelay(relay);
+  if (!(diagnostics instanceof DebugInfoStore)) throw new TypeError('diagnostics must be a DebugInfoStore.');
+  const recordConsole = value => diagnostics.recordConsole(value);
+  const output = (result, source) => {
+    if (result.stdout) recordConsole({level: 'log', message: result.stdout, source});
+    if (result.stderr) recordConsole({level: 'error', message: result.stderr, source});
+  };
   const worker = new Worker(new URL('./dotnetdide.worker.js', import.meta.url), { type: 'module', name: 'dotnetdide' });
   const pending = new Map();
   let sequence = 0;
@@ -22,6 +30,9 @@ export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networ
   worker.onerror = event => { event.preventDefault(); terminate(new Error(event.message || 'Runspace worker failed.')); };
   worker.onmessageerror = () => terminate(new Error('Runspace response could not be decoded.'));
   worker.onmessage = ({ data }) => {
+    if (closed) return;
+    if (data.type === 'console') { recordConsole({...data.entry, source: `${debugScope} · runtime`}); return; }
+    if (data.assemblies) diagnostics.setAssemblies(data.assemblies, debugScope);
     const item = pending.get(data.id);
     if (!item) return;
     pending.delete(data.id); item.cleanup();
@@ -46,11 +57,24 @@ export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networ
   let version;
   try { version = await request('initialize', { networkAccess, nugetAccess, siteAccess, relay }, { signal, timeoutMs: startupTimeoutMs }); }
   catch (error) { terminate(error); throw error; }
-  return {
+  const runspace = {
     version,
     runCSharpAsync(code, options) {
       if (typeof code !== 'string') return Promise.reject(new TypeError('code must be a string.'));
-      return request('run', code, options);
+      return request('run', {code, debugInfo: JSON.stringify(diagnostics.snapshot())}, options).then(result => {
+        output(result, `${debugScope} · C#`);
+        for (const item of result.diagnostics ?? []) recordConsole({level: item.severity.toLowerCase() === 'error' ? 'error' : 'warn',
+          source: `${debugScope} · compiler`, message: `${item.id} (${item.line},${item.column}): ${item.message}`});
+        if (result.error) recordConsole({level: 'error', source: `${debugScope} · C#`, message: `${result.error.type}: ${result.error.message}`});
+        return result;
+      });
+    },
+    async LoadNuget(name, version = null) {
+      if (typeof name !== 'string' || (version !== null && typeof version !== 'string')) throw new TypeError('Package name and version must be strings.');
+      const code = `System.Text.Json.JsonSerializer.Serialize(await DotnetDide.Nuget.Load(${JSON.stringify(name)}, ${JSON.stringify(version)}), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))`;
+      const result = await runspace.runCSharpAsync(code);
+      if (!result.success) throw new Error(result.error?.message ?? result.diagnostics.map(item => item.message).join('\n'));
+      return JSON.parse(result.value);
     },
     setNetworkAccess(enabled) {
       if (typeof enabled !== 'boolean') return Promise.reject(new TypeError('networkAccess must be a boolean.'));
@@ -65,7 +89,17 @@ export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networ
       return request('site-access', enabled);
     },
     listSites: () => request('sites'),
-    requestSite: (value, options = {}) => request('site-request', value, { timeoutMs: 20000, ...options }),
+    listAssemblies: () => request('assemblies'),
+    requestSite: (value, options = {}) => diagnostics.network.trace(value, async () => {
+      const result = await request('site-request', value, { timeoutMs: 20000, ...options });
+      output(result, `${debugScope} · site :${value.port}`);
+      return result;
+    }, debugScope),
+    getDebugInfo: () => diagnostics.snapshot(),
+    GetDebugInfo: () => diagnostics.snapshot(),
+    clearDebugInfo: () => diagnostics.clear(),
+    onDebugInfoChanged: listener => diagnostics.subscribe(listener),
+    recordConsole,
     reset: () => request('reset'),
     terminate,
     exportWorkspace: () => files('export'),
@@ -92,4 +126,5 @@ export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networ
       rename: (path, destination) => files('rename', { path, destination }),
     },
   };
+  return runspace;
 }

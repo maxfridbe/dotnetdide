@@ -154,6 +154,18 @@ public sealed class VirtualNetworkTests
         await browser.WaitForAsync("document.querySelector('#virtual-debugger').dataset.dock==='bottom'");
         Assert.True((await browser.EvaluateAsync("return document.documentElement.scrollWidth<=innerWidth && monaco.editor.getModels()[0]===originalModel;")).GetBoolean());
         await browser.ScreenshotAsync("playground-network-mobile.png");
+        await browser.EvaluateFrameAsync("site-frame", "console.info('Live iframe console', {answer:42}); console.warn('Example warning'); console.error('Example error', new Error('Example stack')); return true;");
+        await browser.EvaluateAsync("document.querySelector('[data-debugger-tab=Console]').click();");
+        await browser.WaitForAsync("document.querySelector('.console-content')?.textContent.includes('Live iframe console')");
+        await browser.EvaluateAsync("const pane=document.querySelector('.console-content');pane.scrollTop=pane.scrollHeight;");
+        await browser.ScreenshotAsync("playground-console-mobile.png");
+        await browser.SetViewportAsync(1280, 1000);
+        await browser.EvaluateAsync("document.querySelector('[data-network-action=dock]').click();");
+        await browser.ScreenshotAsync("playground-console-desktop.png");
+        await browser.EvaluateAsync("document.querySelector('[data-debugger-tab=Assemblies]').click();");
+        await browser.WaitForAsync("!!document.querySelector('[data-assembly-name=\"DotnetDide.Core\"]')");
+        await browser.ScreenshotAsync("playground-assemblies.png");
+        await browser.EvaluateAsync("document.querySelector('[data-debugger-tab=Network]').click();");
         await browser.EvaluateAsync("document.querySelector('#reset').click();");
         await browser.WaitForAsync("!document.querySelector('#run').disabled");
         Assert.True((await browser.EvaluateAsync("return document.querySelectorAll('[data-network-id]').length===recordedCount;")).GetBoolean());

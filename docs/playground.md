@@ -1,4 +1,4 @@
-# Playground and virtual Network debugger
+# Playground and virtual DevTools
 
 The playground uses **TypeScript and Snabbdom**, with Monaco as an editor component.
 Open [the live playground](https://maxfridbe.github.io/dotnetdide/), enable
@@ -13,9 +13,30 @@ Virtual ports use messages, not OS sockets.
 
 [Desktop capture](images/network-debugger.png) · [Phone capture](images/network-debugger-mobile.png)
 
+## Console, assemblies and application debugging
+
+Select **Console** beside **Network** in Virtual DevTools. It shows C# stdout and
+stderr, compiler/runtime failures, Wire ILogger output, and hosted iframe console
+messages, uncaught errors and rejected promises. Filter by level or text/source,
+expand stack traces, pause capture, clear, preserve across resets, copy matching
+entries, or **Export debug info** to download both network and console data.
+
+[Desktop Console](images/console-debugger.png) · [Phone Console](images/console-debugger-mobile.png) · [Assemblies](images/assemblies-debugger.png)
+
+The **Assemblies** tab lists real loaded .NET assemblies with names, versions, full
+identities, filtering and export. It updates after runtime operations, including
+NuGet loads; the snapshot remains available after stopping a worker.
+
+The **Debug your application** example demonstrates `Dotnet.GetDebugInfo()` in a
+later C# submission and saves `debug-info.json` in workspace files. The JavaScript
+host can read live snapshots using `runtime.GetDebugInfo()` / `getDebugInfo()`.
+Both APIs read the same store used by this UI. See [llm.md](../llm.md#debug-your-own-application)
+for a complete self-debugging recipe and schema. Console capture is diagnostic
+output, not a JavaScript REPL or access to native browser developer tools.
+
 ## Controls
 
-- **Network** in the header toggles the debugger. **Alt+N** works throughout the
+- **DevTools** in the header toggles the debugger. **Alt+N** works throughout the
   page. F12 also toggles it when the browser delivers that key to the page; some
   browsers reserve F12 for their native tools.
 - Select a request to inspect **Headers**, **Payload**, **Response**, and **Timing**.
@@ -60,17 +81,17 @@ const monitor = new VirtualNetworkDebugger(() => {
 });
 tree = patch(tree, monitor.view());
 
-const runtime = await loadDotnetdide({siteAccess: true});
-const send = runtime.requestSite.bind(runtime);
-runtime.requestSite = (request, options) =>
-  monitor.trace(request, () => send(request, options), "My application");
-// Pass this runtime.requestSite into createWirePreview as usual.
+const runtime = await loadDotnetdide({siteAccess: true,
+  diagnostics: monitor.diagnostics, debugScope: "My application"});
+// createWirePreview({iframe, port: 8080,
+//   request: value => runtime.requestSite(value), onConsole: runtime.recordConsole});
+const snapshot = runtime.GetDebugInfo(); // Same network and console entries as the UI.
 // On host teardown: monitor.dispose(); runtime.terminate();
 ```
 
 Load `network-debugger.css` in the host page. The host owns the patch loop and
 placement; call your render function on window resize to update responsive docking.
-Use `monitor.log.beginRunspace()` at reset/new-worker boundaries to honor Preserve
+Use `monitor.diagnostics.beginRunspace()` at reset/new-worker boundaries to honor Preserve
 log. Recording returns the original response and rethrows transport failures.
 For a custom UI, import `VirtualNetworkLog` from `playground/network-log.js`.
 

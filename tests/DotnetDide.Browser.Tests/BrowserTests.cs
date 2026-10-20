@@ -75,13 +75,13 @@ public sealed class BrowserTests
         await browser.WaitForAsync("document.querySelector('#code-editor')?.dataset.editor === 'monaco'");
         Assert.Equal("csharp", (await browser.EvaluateAsync("return monaco.editor.getModels()[0].getLanguageId();")).GetString());
         Assert.True((await browser.EvaluateAsync("return document.querySelector('#code').hidden && !!document.querySelector('#monaco .view-lines');")).GetBoolean());
-        Assert.Equal(11, (await browser.EvaluateAsync("return document.querySelectorAll('#examples button').length;")).GetInt32());
+        Assert.Equal(13, (await browser.EvaluateAsync("return document.querySelectorAll('#examples button').length;")).GetInt32());
         await browser.EvaluateAsync("document.querySelector('#run').click();");
         await browser.WaitForAsync("!document.querySelector('#run').disabled && !!document.querySelector('#files button')");
         await browser.EvaluateAsync("document.querySelector('#check').click();");
         await browser.WaitForAsync("!document.querySelector('#check').disabled");
-        Assert.True((await browser.EvaluateAsync("return document.querySelector('#check-summary').textContent === '11/11 checks passed';")).GetBoolean(), (await browser.EvaluateAsync("return document.querySelector('#checks').textContent + document.querySelector('#status').textContent;")).GetString());
-        Assert.Equal(11, (await browser.EvaluateAsync("return document.querySelectorAll('#checks [data-state=pass]').length;")).GetInt32());
+        Assert.True((await browser.EvaluateAsync("return document.querySelector('#check-summary').textContent === '12/12 checks passed';")).GetBoolean(), (await browser.EvaluateAsync("return document.querySelector('#checks').textContent + document.querySelector('#status').textContent;")).GetString());
+        Assert.Equal(12, (await browser.EvaluateAsync("return document.querySelectorAll('#checks [data-state=pass]').length;")).GetInt32());
         Assert.Contains("outputs/answer.txt", (await browser.EvaluateAsync("return document.querySelector('#files').textContent;")).GetString());
         await browser.EvaluateAsync("monaco.editor.getModels()[0].setValue('answer + 3'); document.querySelector('#run').click();");
         await browser.WaitForAsync("!document.querySelector('#run').disabled");

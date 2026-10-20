@@ -1,3 +1,6 @@
+import type {DebugInfoStore, DebugInfo, ConsoleMessage, LoadedAssembly} from "./playground/debug-info.js";
+export {DebugInfoStore} from "./playground/debug-info.js";
+export type {DebugInfo, ConsoleMessage, ConsoleEntry, LoadedAssembly} from "./playground/debug-info.js";
 export interface Diagnostic { id: string; severity: string; message: string; line: number; column: number }
 export interface SubmissionResult {
   success: boolean; stdout: string; stderr: string; value: string | null;
@@ -5,15 +8,22 @@ export interface SubmissionResult {
 }
 export interface Workspace { version: number; directories: string[]; files: {path: string; data: string}[] }
 export interface WireRequest { port: number; method: string; path: string; headers?: Record<string, string[]>; body?: string | null }
-export interface WireResponse { status: number; headers: Record<string, string[]>; body: string; error?: string | null }
+export interface WireResponse { status: number; headers: Record<string, string[]>; body: string; error?: string | null; stdout?: string; stderr?: string }
 export interface WireSite { port: number; webRoot: string | null }
 export interface RequestOptions { signal?: AbortSignal; timeoutMs?: number }
 export interface Runspace {
   version: string;
+  LoadNuget(name: string, version?: string | null): Promise<{name: string; version: string; packages: {name: string; version: string}[]}>;
+  getDebugInfo(): DebugInfo;
+  GetDebugInfo(): DebugInfo;
+  clearDebugInfo(): void;
+  onDebugInfoChanged(listener: () => void): () => void;
+  recordConsole(value: ConsoleMessage): void;
   runCSharpAsync(code: string, options?: RequestOptions): Promise<SubmissionResult>;
   setNetworkAccess(enabled: boolean): Promise<void>;
   setNugetAccess(enabled: boolean): Promise<void>;
   setSiteAccess(enabled: boolean): Promise<void>;
+  listAssemblies(): Promise<LoadedAssembly[]>;
   listSites(): Promise<WireSite[]>;
   requestSite(value: WireRequest, options?: RequestOptions): Promise<WireResponse>;
   reset(): Promise<void>; terminate(): void;
@@ -29,11 +39,13 @@ export interface Runspace {
 }
 export function loadDotnetdide(options?: {
   signal?: AbortSignal; startupTimeoutMs?: number; networkAccess?: boolean;
+  diagnostics?: DebugInfoStore; debugScope?: string;
   nugetAccess?: boolean; siteAccess?: boolean; relay?: {endpoint: string; token?: string} | null;
 }): Promise<Runspace>;
-export interface WirePreview { navigate(path: string): Promise<void>; destroy(): void }
+export interface WirePreview { reload(): Promise<void>; navigate(path: string): Promise<void>; destroy(): void }
 export function createWirePreview(options: {
   iframe: HTMLIFrameElement; port: number; path?: string;
+  onConsole?: (entry: ConsoleMessage) => void;
   onNavigate?: (path: string) => void; request: (value: WireRequest) => Promise<WireResponse>;
 }): Promise<WirePreview>;
 export function clearNugetCache(): Promise<void>;

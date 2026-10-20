@@ -191,3 +191,27 @@ quota errors fall back to downloading. `await clearNugetCache()` deletes the cac
 but does not unload active assemblies; terminate the worker for that. Cache
 Storage is shared by same-origin embeds, so use a separate origin if they need
 separate package storage. Browser site-data controls also clear it.
+
+## JavaScript LoadNuget example
+
+```js
+import {loadDotnetdide} from './dotnetdide.js';
+const DotnetDide = await loadDotnetdide({nugetAccess: true, networkAccess: false});
+const loaded = await DotnetDide.LoadNuget("Newtonsoft.Json", "13.0.4");
+console.log(loaded.name, loaded.version, loaded.packages);
+// Use the package only in a subsequent submission, after loading completes.
+const result = await DotnetDide.runCSharpAsync(
+  'Newtonsoft.Json.JsonConvert.SerializeObject(new { answer = 42 })');
+console.log(result.value); // {"answer":42}
+// DotnetDide.terminate() when finished.
+```
+
+`DotnetDide` above is the JavaScript runspace variable, not a C# namespace method.
+Inside C# submissions use `await DotnetDide.Nuget.Load("Newtonsoft.Json", "13.0.4")`
+in step 1, then reference the package's types in step 2. The playground's **Load a
+NuGet package** example demonstrates those two steps. Enable **NuGet downloads**
+first; Run all checks skips this example while that permission is off. Downloads
+use the browser and existing bounded Cache Storage, not localStorage. General
+network access is independent. `LoadNuget` rejects when permission is disabled or
+a package is incompatible; it does not silently grant permission. Already bundled
+image/audio defaults remain available without downloading them.

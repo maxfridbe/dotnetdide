@@ -69,13 +69,12 @@ async function action(work: (active: Runspace, signal: AbortSignal) => Promise<s
   job = current; changed();
   try {
     if (isolated || !runtime) {
-      if (!isolated) network.log.beginRunspace();
+      if (!isolated) network.diagnostics.beginRunspace();
       status("Loading .NET 11 and Roslyn… First load may take a minute.", "busy");
-      const loaded = await loadDotnetdide({signal: current.controller.signal, nugetAccess, networkAccess, siteAccess: isolated || siteAccess});
+      const loaded = await loadDotnetdide({signal: current.controller.signal, nugetAccess, networkAccess, siteAccess: isolated || siteAccess,
+        diagnostics: network.diagnostics, debugScope: isolated ? "Checks" : "Playground"});
       current.runtime = loaded;
       if (job !== current) { loaded.terminate(); return; }
-      const send = loaded.requestSite.bind(loaded);
-      loaded.requestSite = (request, options) => network.trace(request, () => send(request, options), isolated ? "Checks" : "Playground");
       if (!isolated) runtime = loaded;
     } else current.runtime = runtime;
     const message = await work(current.runtime, current.controller.signal);
@@ -85,7 +84,7 @@ async function action(work: (active: Runspace, signal: AbortSignal) => Promise<s
   } catch (error) {
     if (job === current) status(String(error), "error");
   } finally {
-    if (isolated) current.runtime?.terminate();
+    if (isolated) { current.runtime?.terminate(); if (runtime) void runtime.listAssemblies().catch(() => {}); }
     if (job === current) { job = null; changed(); }
   }
 }
@@ -114,14 +113,15 @@ function stop(): void {
 }
 function checkAll(): void {
   if (busy()) return;
-  const rows: Check[] = examples.map(example => ({title: example.title, state: "pending"}));
+  const runnable = examples.filter(example => !example.requiresNuget || nugetAccess);
+  const rows: Check[] = runnable.map(example => ({title: example.title, state: "pending"}));
   checks = rows; checkSummary = "Loading test workspace…";
   void action(async (active, signal) => {
     let passed = 0;
-    for (const [index, example] of examples.entries()) {
+    for (const [index, example] of runnable.entries()) {
       signal.throwIfAborted();
       const row = rows[index]!; row.state = "running";
-      status(`Checking ${index + 1}/${examples.length}: ${example.title}…`, "busy");
+      status(`Checking ${index + 1}/${runnable.length}: ${example.title}…`, "busy");
       await active.reset(); await active.importWorkspace({version: 1, directories: [], files: []});
       const results: SubmissionResult[] = [];
       for (const code of example.steps) results.push(await active.runCSharpAsync(code, {signal, timeoutMs: 15000}));
@@ -132,11 +132,11 @@ function checkAll(): void {
       if (success) passed++; else row.details = JSON.stringify(results, null, 2);
       checkSummary = `${passed}/${index + 1} checks passed`; changed();
     }
-    checkSummary = `${passed}/${examples.length} checks passed`;
-    return `${passed}/${examples.length} checks passed on .NET ${active.version}. Your workspace is unchanged.`;
+    checkSummary = `${passed}/${runnable.length} checks passed`;
+    return `${passed}/${runnable.length} checks passed on .NET ${active.version}. Your workspace is unchanged.`;
   }, true).finally(() => {
     for (const row of rows) if (row.state === "running" || row.state === "pending") { row.state = "fail"; row.details = "Not completed; see status."; }
-    if (rows.some(row => row.state === "fail")) checkSummary = `${rows.filter(row => row.state === "pass").length}/${examples.length} checks passed; see failures and status.`;
+    if (rows.some(row => row.state === "fail")) checkSummary = `${rows.filter(row => row.state === "pass").length}/${runnable.length} checks passed; see failures and status.`;
     changed();
   });
 }
@@ -147,6 +147,7 @@ async function openSite(): Promise<void> {
   try {
     const created = await createWirePreview({
       iframe: document.querySelector<HTMLIFrameElement>("#site-frame")!, port: Number(sitePort), path: sitePath,
+      onConsole: entry => { if (runtime === active && previewGeneration === generation) active.recordConsole(entry); },
       onNavigate: path => { if (previewGeneration === generation) { sitePath = path; changed(); } },
       request: request => {
         const next = siteQueue.catch(() => {}).then(async () => {
@@ -191,8 +192,8 @@ function view(): VNode {
       h("a.brand", {attrs: {href: "./"}}, ["dotnet", h("span", "dide")]),
       h("span.app-subtitle", "C# playground"), h("span.badge", ".NET 11 · WASM"),
       h("nav", {attrs: {"aria-label": "Playground tools"}}, [
-        h("button#network-toggle", {attrs: {type: "button", "aria-pressed": String(network.open), "aria-controls": "virtual-debugger", title: "Toggle virtual network debugger (Alt+N)"},
-          on: {click: () => network.toggle()}}, "⌘ Network"),
+        h("button#network-toggle", {attrs: {type: "button", "aria-pressed": String(network.open), "aria-controls": "virtual-debugger", title: "Toggle virtual debugger (Alt+N)"},
+          on: {click: () => network.toggle()}}, "⌘ DevTools"),
         h("a", {attrs: {href: "docs/playground.md"}}, "Guide"),
         h("a", {attrs: {href: "https://github.com/maxfridbe/dotnetdide"}}, "Source ↗"),
       ]),
@@ -204,7 +205,7 @@ function view(): VNode {
           h("button", {key: example.id, attrs: {type: "button", "data-example": example.id, "aria-pressed": String(example === selected)},
             on: {click: () => selectExample(example)}}, [h("small", example.category), example.title]))),
         h("section.checks-panel", [
-          h("h2", "Runtime checks"), h("p.hint", "Verify every example in a separate workspace. Your editor and files stay intact."),
+          h("h2", "Runtime checks"), h("p.hint", "Verify examples in a separate workspace. The NuGet example runs only when NuGet downloads is enabled. Your editor and files stay intact."),
           button("check", "▷ Run all checks", busy(), checkAll),
           h("p#check-summary", {attrs: {role: "status"}}, checkSummary),
           h("ol#checks", {attrs: {"aria-label": "Check results"}}, checks.map((row, index) =>
@@ -224,7 +225,7 @@ function view(): VNode {
             h("div.toolbar", [
               button("run", "▶ Run C#", busy(), run),
               button("reset", "Reset variables", busy() || !runtime, () => { void action(async active => {
-                clearPreview(); network.log.beginRunspace(); await active.reset(); return "Variables reset; workspace files retained. Ready.";
+                clearPreview(); network.diagnostics.beginRunspace(); await active.reset(); return "Variables reset; workspace files retained. Ready.";
               }); }),
               button("stop", "■ Stop worker", !job && !runtime, stop),
             ]),
@@ -265,7 +266,7 @@ function view(): VNode {
             ]),
             h("iframe#site-frame", {key: "site-frame", attrs: {title: "Interactive C# site", sandbox: "allow-scripts allow-forms", referrerpolicy: "no-referrer", hidden: !previewVisible}}),
             !previewVisible ? h("div.preview-placeholder", [h("span", "⌘"), h("p", "Your C# site runs here"), h("small", "Enable Interactive sites → run the site example → Open / Reload")]) : null,
-            h("p.hint", ["An isolated iframe calls your local C# routes. Requests appear in the Network debugger. ",
+            h("p.hint", ["An isolated iframe calls your local C# routes. Requests and console output appear in DevTools. ",
               h("a", {attrs: {href: "docs/wire.md"}}, "Wire guide"), " · ", h("a", {attrs: {href: "examples/site.cs"}}, "Sample C#")]),
           ]),
           h("section.files-panel.panel", {attrs: {"aria-labelledby": "files-title"}}, [

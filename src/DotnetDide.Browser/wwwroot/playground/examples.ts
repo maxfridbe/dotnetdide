@@ -1,7 +1,7 @@
 import type {Runspace, SubmissionResult} from "../dotnetdide.js";
 export interface Example {
   id: string; title: string; category: string; description: string; expected: string;
-  steps: string[]; expectsFailure?: boolean;
+  steps: string[]; expectsFailure?: boolean; requiresNuget?: boolean;
   verify(results: SubmissionResult[], runtime: Runspace): Promise<boolean> | boolean;
 }
 // The same examples power the editor and real browser checks. No mocked results.
@@ -133,6 +133,30 @@ var program = await Dotnet.Run("Demo.csproj");
 program.Success`],
     verify: async (results, runtime) => results[0]!.value === 'True' && results[0]!.stdout.includes('Build succeeded') &&
       await runtime.FS.readFile('app/result.txt', { encoding: 'utf8' }) === '42' && (await runtime.FS.readFile('app/bin/Demo.dll')).length > 0,
+  },
+  {
+    id: 'nuget', title: 'Load a NuGet package', category: 'NUGET · PERMISSION', requiresNuget: true,
+    description: 'Enable NuGet downloads below. Run step 1 to load Newtonsoft.Json, then step 2 to use it and save JSON. General Network access can stay off.',
+    expected: 'Downloads a compatible managed package in the browser and creates nuget-result.json. JavaScript hosts can use await DotnetDide.LoadNuget("Newtonsoft.Json", "13.0.4").',
+    steps: ['await DotnetDide.Nuget.Load("Newtonsoft.Json", "13.0.4");', `var packageJson = Newtonsoft.Json.JsonConvert.SerializeObject(new {answer = 42});
+File.WriteAllText("nuget-result.json", packageJson);
+packageJson`],
+    verify: async (results, runtime) => results[1]!.value === '{"answer":42}' &&
+      await runtime.FS.readFile('nuget-result.json', {encoding:'utf8'}) === '{"answer":42}',
+  },
+  {
+    id: 'debug', title: 'Debug your application', category: 'CONSOLE · DIAGNOSTICS',
+    description: 'Run step 1 to write output, then step 2 to read the same diagnostics shown by DevTools. Open the Console tab for logs.',
+    expected: 'Saves debug-info.json with network requests and console messages from earlier operations.',
+    steps: ['Console.WriteLine("Debug sample output");', `using System.Text.Json;
+var debugJson = Dotnet.GetDebugInfo();
+File.WriteAllText("debug-info.json", debugJson);
+int debugCount;
+using (var debugDocument = JsonDocument.Parse(debugJson))
+    debugCount = debugDocument.RootElement.GetProperty("console").GetArrayLength();
+debugCount`],
+    verify: async (_results, runtime) => JSON.parse(await runtime.FS.readFile('debug-info.json', {encoding:'utf8'})).console
+      .some((entry: {message: string}) => entry.message.includes('Debug sample output')),
   },
   {
     id: 'site', title: 'Host an interactive site', category: 'ASP.NET CORE · ISERVER',

@@ -4,12 +4,17 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace DotnetDide;
 
 public sealed record WireSite(int Port, string? WebRoot);
 public sealed record WireRequest(int Port, string Method, string Path, Dictionary<string, string[]>? Headers = null, string? Body = null);
-public sealed record WireResponse(int Status, Dictionary<string, string[]> Headers, string Body, string? Error = null);
+public sealed record WireResponse(int Status, Dictionary<string, string[]> Headers, string Body, string? Error = null)
+{
+    public string Stdout { get; init; } = "";
+    public string Stderr { get; init; } = "";
+}
 
 /// <summary>ASP.NET Core middleware and IServer hosting over browser messages, without listening sockets.</summary>
 public static class Wire
@@ -19,7 +24,10 @@ public static class Wire
     public static IApplicationBuilder CreateApplication()
     {
         Registry.CheckPermission();
-        var services = new ServiceCollection(); services.AddLogging(); services.AddRouting();
+        var services = new ServiceCollection(); services.AddLogging(logging => logging
+            // The pinned WASM interpreter cannot execute EndpointMiddleware's informational async logging path.
+            .AddFilter("Microsoft.AspNetCore.Routing.EndpointMiddleware", LogLevel.Warning)
+            .AddProvider(new WireConsoleLoggerProvider())); services.AddRouting();
         services.AddSingleton(_ => new System.Diagnostics.DiagnosticListener("DotnetDide.Wire"));
         services.AddSingleton<System.Diagnostics.DiagnosticSource>(provider => provider.GetRequiredService<System.Diagnostics.DiagnosticListener>());
         var provider = services.BuildServiceProvider(); Registry.Own(provider);

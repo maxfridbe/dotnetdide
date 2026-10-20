@@ -1,6 +1,6 @@
 // Interactive HTML lives in an opaque iframe. Only virtual HTTP messages cross
 // into the host; no session storage, model keys, DOM handles or worker references.
-export async function createWirePreview({ iframe, request, port, path = '/', onNavigate = () => {} }) {
+export async function createWirePreview({ iframe, request, port, path = '/', onNavigate = () => {}, onConsole = () => {} }) {
   if (!(iframe instanceof HTMLIFrameElement)) throw new TypeError('An iframe is required.');
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new TypeError('Invalid virtual port.');
   iframe.setAttribute('sandbox', 'allow-scripts allow-forms'); iframe.referrerPolicy = 'no-referrer';
@@ -68,7 +68,17 @@ export async function createWirePreview({ iframe, request, port, path = '/', onN
       globalThis.removeEventListener('message', receive);
       const pair = new MessageChannel(); channel = pair.port1;
       channel.onmessage = async ({ data }) => {
-        if (closed || mine !== generation || !Number.isSafeInteger(data?.id)) return;
+        if (closed || mine !== generation) return;
+        if (data?.type === 'console') {
+          const entry = data.entry;
+          if (entry && ['debug','log','info','warn','error'].includes(entry.level) && typeof entry.message === 'string') {
+            try { onConsole({level:entry.level, message:entry.message.slice(0,16384),
+              source:`iframe :${port}${currentPath.split('?')[0]}`, truncated:entry.truncated === true,
+              ...(typeof entry.stack === 'string' ? {stack:entry.stack.slice(0,8192)} : {})}); } catch { /* Logging cannot interrupt requests. */ }
+          }
+          return;
+        }
+        if (!Number.isSafeInteger(data?.id)) return;
         const respond = message => { if (!closed && mine === generation) pair.port1.postMessage({id:data.id,...message}); };
         try {
           if (data.navigate) { await render(local(data.navigate, currentPath)); return; }
@@ -95,12 +105,65 @@ export async function createWirePreview({ iframe, request, port, path = '/', onN
 
 function guest(token, base) {
   let port, sequence = 0; const pending = new Map();
+  const logs = []; let dropped = 0, flushTimer = null;
+  const flush = () => {
+    flushTimer = null;
+    if (!port) return;
+    if (dropped) { port.postMessage({type:'console',entry:{level:'warn',message:`${dropped} iframe messages dropped during a log burst.`}}); dropped = 0; }
+    for (const entry of logs.splice(0)) port.postMessage({type:'console',entry});
+  };
+  const describe = value => {
+    const seen = new WeakSet();
+    const safe = (item, depth) => {
+      if (typeof item === 'string') return item.slice(0, 16384);
+      if (typeof item === 'bigint') return String(item) + 'n';
+      if (item === undefined) return 'undefined';
+      if (typeof item === 'function' || typeof item === 'symbol') return String(item).slice(0, 512);
+      if (!item || typeof item !== 'object') return item;
+      if (seen.has(item)) return '[Circular]';
+      if (depth >= 4) return '[Object]';
+      seen.add(item);
+      if (item instanceof Error) return `${item.name}: ${item.message}`.slice(0, 8192);
+      const result = {};
+      for (const key of Object.keys(item).slice(0, 40)) {
+        const descriptor = Object.getOwnPropertyDescriptor(item, key);
+        Object.defineProperty(result,key,{value:descriptor && 'value' in descriptor ? safe(descriptor.value,depth+1) : '[Getter]',enumerable:true});
+      }
+      return result;
+    };
+    try { return typeof value === 'string' ? value.slice(0,16384) : JSON.stringify(safe(value,0)); }
+    catch { return '[Unserializable]'; }
+  };
+  const capture = (level, args, stack) => {
+    try {
+      const values = Array.from(args).slice(0,20);
+      stack ??= values.find(value => value instanceof Error)?.stack;
+      const message = values.map(describe).join(' ');
+      const entry = {level, message:message.slice(0,16384),
+        truncated:message.length > 16384 || args.length > 20 || values.some(value => typeof value === 'string' && value.length > 16384) || String(stack ?? '').length > 8192,
+        ...(stack ? {stack:String(stack).slice(0,8192)} : {})};
+      if (logs.length >= 200) { logs.shift(); dropped++; }
+      logs.push(entry);
+      if (port && flushTimer === null) flushTimer = setTimeout(flush,0);
+    } catch { /* Console capture must not change the program. */ }
+  };
+  for (const level of ['debug','log','info','warn','error']) {
+    const original = console[level].bind(console);
+    console[level] = (...args) => { capture(level,args); return original(...args); };
+  }
+  const originalAssert = console.assert.bind(console);
+  console.assert = (condition,...args) => { if (!condition) capture('error',['Assertion failed:',...args]); return originalAssert(condition,...args); };
+  addEventListener('error', event => {
+    const message = event.message || `Resource failed: ${event.target?.tagName || 'unknown'}`;
+    capture('error',[message],event.error?.stack);
+  },true);
+  addEventListener('unhandledrejection',event => capture('error',['Unhandled promise rejection:',event.reason],event.reason?.stack));
   const connected = new Promise(resolve => {
     const connect = event => {
       if (event.source !== parent || event.data?.type !== 'dotnetdide-wire-connect' || event.data.token !== token || !event.ports[0]) return;
       removeEventListener('message', connect);port=event.ports[0];
       port.onmessage = ({data}) => { const item=pending.get(data.id);if(!item)return;pending.delete(data.id);clearTimeout(item.timer);data.error?item.reject(new Error(data.error)):item.resolve(data.response); };
-      resolve();
+      flush(); resolve();
     };
     addEventListener('message',connect);parent.postMessage({type:'dotnetdide-wire-ready',token},'*');
   });

@@ -71,11 +71,11 @@ public sealed class WireBrowserTests
             if (!started.success) throw Error(JSON.stringify(started));
             globalThis.weather = async () => {
                 const response = await siteNet.requestSite({port:8080,method:'GET',path:'/api/weather'});
-                return {status:response.status,body:atob(response.body)};
+                return {status:response.status,body:atob(response.body),error:response.error,stdout:response.stdout,stderr:response.stderr};
             };
             """);
         var blocked = await browser.EvaluateAsync("return await weather();");
-        Assert.Equal(502, blocked.GetProperty("status").GetInt32());
+        Assert.True(blocked.GetProperty("status").GetInt32() == 502, blocked.ToString());
         Assert.Contains("Network access is disabled", blocked.GetProperty("body").GetString());
         Assert.Equal(0, browser.NetworkRequests);
         await browser.EvaluateAsync("await siteNet.setNetworkAccess(true);");
@@ -85,7 +85,7 @@ public sealed class WireBrowserTests
         Assert.Equal(1, browser.NetworkRequests);
         await browser.EvaluateAsync("await siteNet.setNetworkAccess(false);");
         var revoked = await browser.EvaluateAsync("return await weather();");
-        Assert.Equal(502, revoked.GetProperty("status").GetInt32());
+        Assert.True(revoked.GetProperty("status").GetInt32() == 502, revoked.ToString());
         Assert.Contains("Network access is disabled", revoked.GetProperty("body").GetString());
         Assert.Equal(1, browser.NetworkRequests);
         await browser.EvaluateAsync("siteNet.terminate();");
