@@ -73,7 +73,8 @@ export class VirtualNetworkDebugger {
     }, tab);
     let content: VNode;
     if (this.tab === "Payload") content = this.body(entry.requestBody);
-    else if (this.tab === "Response") content = this.body(entry.responseBody);
+    else if (this.tab === "Response") content = !entry.responseBody && entry.duration !== null
+      ? h("p.network-error", `No response received. ${entry.error ?? ""}`) : this.body(entry.responseBody);
     else if (this.tab === "Timing") content = h("div.network-timing", [
       h("h3", "Virtual request timing"),
       h("p", entry.duration === null ? "Request pending…" : `Total: ${elapsed(entry.duration)}`),

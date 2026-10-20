@@ -26,6 +26,8 @@ public sealed class VirtualNetworkTests
             assert(pane().querySelector('pre').textContent.includes('<script>') && !globalThis.responseExecuted && !pane().querySelector('script'),'Response HTML executed');
             try{await debug.trace({port:9000,method:'GET',path:'/failed'},()=>Promise.reject(Error('Worker stopped')));}catch{}
             assert(pane().querySelector('tbody').textContent.includes('Failed'),'Transport failure missing');
+            [...pane().querySelectorAll('tbody tr')].find(row=>row.textContent.includes('Failed')).querySelector('button').click();
+            assert(pane().querySelector('.network-detail-content').textContent.includes('No response received. Error: Worker stopped'),'Failure shown as still waiting');
             pane().querySelector('[data-network-action=clear]').click();
             assert(!pane().querySelector('tbody tr') && !pane().querySelector('.network-details'),'Clear retained stale selection');
             const before=pane().getBoundingClientRect().height;
