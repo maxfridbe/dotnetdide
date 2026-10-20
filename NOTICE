@@ -19,3 +19,12 @@ Unmodified prebuilt browser assets and license notices are in
 src/DotnetDide.Browser/wwwroot/vendor/monaco/. See README.txt there for the
 upstream download and verified SHA-512 integrity. Monaco is a playground UI
 dependency, not a dependency of the .NET runspace SDK.
+
+Bundled media libraries (explicit package versions are locked):
+StbImageSharp 2.30.16 (Unlicense OR MIT), StbImageWriteSharp 1.16.7 (public domain),
+NAudio.Core 3.3.0 (MIT), Concentus 2.2.2 (BSD-style license, multiple authors), and
+Concentus.Oggfile 1.0.7 (MIT). The package loader also uses NuGet.Frameworks and
+NuGet.Versioning 7.9.0 (Apache-2.0). See docs/licenses for upstream notices;
+Microsoft System.* dependencies use their respective .NET licenses.
+Packages downloaded at runtime have their own licenses and are not part of this
+bundled distribution.

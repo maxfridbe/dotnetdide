@@ -58,7 +58,7 @@ internal sealed class BrowserHarness : IAsyncDisposable
         Directory.CreateDirectory(_profile);
         var chrome = Environment.GetEnvironmentVariable("CHROME_BIN") ?? "/usr/bin/google-chrome";
         var start = new ProcessStartInfo(chrome) { RedirectStandardError = true, RedirectStandardOutput = true };
-        foreach (var argument in new[] { "--headless=new", "--window-size=1280,1000", "--no-sandbox", "--remote-debugging-port=0", "--no-first-run", "--disable-background-networking", "--disable-dev-shm-usage", "--user-data-dir=" + _profile, "about:blank" }) start.ArgumentList.Add(argument);
+        foreach (var argument in new[] { "--headless=new", "--password-store=basic", "--use-mock-keychain", "--window-size=1280,1000", "--no-sandbox", "--remote-debugging-port=0", "--no-first-run", "--disable-background-networking", "--disable-component-update", "--disable-sync", "--no-proxy-server", "--disable-dev-shm-usage", "--user-data-dir=" + _profile, "about:blank" }) start.ArgumentList.Add(argument);
         _chrome = Process.Start(start)!;
         _chrome.ErrorDataReceived += (_, e) => { if (e.Data is not null) lock (_errors) { if (_errors.Count < 100) _errors.Add(e.Data); } }; _chrome.BeginErrorReadLine();
         _chrome.BeginOutputReadLine();

@@ -4,4 +4,4 @@
 <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
 <ProjectReference Include="../../src/DotnetDide.Core/DotnetDide.Core.csproj" />
 <Using Include="Xunit" />
-</ItemGroup></Project>
+</ItemGroup><ItemGroup><Content Include="../../src/DotnetDide.Browser/wwwroot/examples/*.cs" Link="media-examples/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" /></ItemGroup></Project>

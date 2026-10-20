@@ -5,8 +5,11 @@
   <WasmEnableWebcil>false</WasmEnableWebcil><WasmFingerprintAssets>false</WasmFingerprintAssets><CompressionEnabled>false</CompressionEnabled>
   <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
 </PropertyGroup>
+<ItemGroup><Compile Remove="wwwroot/examples/**/*.cs" /></ItemGroup>
 <ItemGroup><ProjectReference Include="../DotnetDide.Core/DotnetDide.Core.csproj" /></ItemGroup>
 <ItemGroup>
+  <Content Include="../../docs/media-and-packages.md" Link="wwwroot/docs/media-and-packages.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  <Content Include="../../docs/licenses/**/*" Link="wwwroot/docs/licenses/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   <Content Include="../../docs/networking.md" Link="wwwroot/docs/networking.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   <Content Include="../../llm.md" Link="wwwroot/llm.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   <Content Include="../../docs/runtime-namespaces.md" Link="wwwroot/docs/runtime-namespaces.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

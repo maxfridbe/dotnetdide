@@ -7,7 +7,8 @@ the runtime or project dependencies change.
 The worker passes every `coreAssembly` and `assembly` asset in the runtime boot
 configuration to Roslyn as a metadata reference. These libraries are already
 available to C# submissions; use their namespaces without a separate load step.
-There is no runtime NuGet/package installer yet.
+Additional compatible managed packages can be loaded with permission using
+`await DotnetDide.Nuget.Load("name", "version")`. See [media and package guide](media-and-packages.md).
 
 An assembly being present does **not** mean every API in it works in a browser.
 Some DLLs are compatibility facades, and OS-dependent APIs may throw
@@ -15,7 +16,7 @@ Some DLLs are compatibility facades, and OS-dependent APIs may throw
 matrix. In particular, the presence of Windows/registry/process/watcher assemblies
 does not provide those native facilities in WebAssembly.
 
-This build contains **185 assembly references**, including **164 `System.*` assemblies**.
+This build contains **193 assembly references**, including **165 `System.*` assemblies**.
 
 ## System assemblies
 
@@ -98,6 +99,7 @@ This build contains **185 assembly references**, including **164 `System.*` asse
 - `System.Net.WebSockets.Client.dll`
 - `System.Net.WebSockets.dll`
 - `System.Net.dll`
+- `System.Numerics.Tensors.dll`
 - `System.Numerics.Vectors.dll`
 - `System.Numerics.dll`
 - `System.ObjectModel.dll`
@@ -186,6 +188,8 @@ This build contains **185 assembly references**, including **164 `System.*` asse
 
 ## Other runtime and application assemblies
 
+- `Concentus.Oggfile.dll`
+- `Concentus.dll`
 - `DotnetDide.Browser.dll`
 - `DotnetDide.Core.dll`
 - `Microsoft.CSharp.dll`
@@ -204,6 +208,11 @@ This build contains **185 assembly references**, including **164 `System.*` asse
 - `Microsoft.VisualBasic.dll`
 - `Microsoft.Win32.Primitives.dll`
 - `Microsoft.Win32.Registry.dll`
+- `NAudio.Core.dll`
+- `NuGet.Frameworks.dll`
+- `NuGet.Versioning.dll`
+- `StbImageSharp.dll`
+- `StbImageWriteSharp.dll`
 - `WindowsBase.dll`
 - `mscorlib.dll`
 - `netstandard.dll`

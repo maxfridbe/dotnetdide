@@ -1,3 +1,4 @@
+import { fetchNugetPackage } from './package-cache.js';
 import { relayFetch, validateRelay } from './relay-fetch.js';
 
 // Install before .NET captures fetch. This is a capability control for cooperative
@@ -5,11 +6,19 @@ import { relayFetch, validateRelay } from './relay-fetch.js';
 export function installNetworkPolicy(scope = globalThis) {
   let allowed = true; // Runtime bootstrap must load its own assemblies before user code exists.
   let relay = null;
+  let nugetAllowed = false;
   const sockets = new Set();
   const denied = () => new DOMException('Network access is disabled by the host.', 'NotAllowedError');
   const originalFetch = scope.fetch.bind(scope);
   Object.defineProperty(scope, 'fetch', { configurable: false, writable: false,
     value: async (input, init = {}) => {
+      const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url, scope.location?.href);
+      const method = (init.method ?? (typeof input === 'object' ? input.method : null) ?? 'GET').toUpperCase();
+      if (nugetAllowed && method === 'GET' && url.origin === 'https://api.nuget.org' && !url.search &&
+          /^\/v3-flatcontainer\/[a-z0-9_.-]+\/(?:index\.json|[a-z0-9.+-]+\/[a-z0-9_.+-]+\.nupkg)$/.test(url.pathname)) {
+        // Package permission is direct NuGet.org access only, independent of the general HTTP route.
+        return fetchNugetPackage(originalFetch, input, { ...init, credentials: 'omit', redirect: 'error' });
+      }
       if (!allowed) throw denied();
       // Preserve fetch's signal through body consumption, not only until headers arrive.
       return relay ? relayFetch(originalFetch, relay, input, init) : originalFetch(input, init);
@@ -32,7 +41,7 @@ export function installNetworkPolicy(scope = globalThis) {
         return socket;
       } }) });
   }
-  return (enabled, configuration) => {
+  const configure = (enabled, configuration) => {
     if (typeof enabled !== 'boolean') throw new TypeError('networkAccess must be a boolean.');
     if (configuration !== undefined) relay = validateRelay(configuration);
     allowed = enabled;
@@ -41,4 +50,9 @@ export function installNetworkPolicy(scope = globalThis) {
       sockets.clear();
     }
   };
+  configure.setNugetAccess = enabled => {
+    if (typeof enabled !== 'boolean') throw new TypeError('nugetAccess must be a boolean.');
+    nugetAllowed = enabled;
+  };
+  return configure;
 }

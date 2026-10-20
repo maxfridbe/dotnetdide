@@ -5,11 +5,16 @@ Namespaces containing public types or public type forwarders in the published
 matrix. Some types require browser-specific implementations or are unsupported.
 See [llm.md](../llm.md) for imports, examples and execution constraints.
 
-This build exposes **187 namespace names**. Assembly names and namespace
+This build exposes **206 namespace names**. Assembly names and namespace
 names are not interchangeable; a `using` directive imports a namespace, not a DLL.
 
 | Namespace | Assembly metadata |
 | --- | --- |
+| `Concentus` | `Concentus.dll` |
+| `Concentus.Common` | `Concentus.dll` |
+| `Concentus.Enums` | `Concentus.dll` |
+| `Concentus.Oggfile` | `Concentus.Oggfile.dll` |
+| `Concentus.Structs` | `Concentus.dll` |
 | `DotnetDide` | `DotnetDide.Core.dll` |
 | `DotnetDide.Browser` | `DotnetDide.Browser.dll` |
 | `Dotnetdide` | `DotnetDide.Core.dll` |
@@ -48,8 +53,21 @@ names are not interchangeable; a `using` directive imports a namespace, not a DL
 | `Microsoft.VisualBasic.FileIO` | `Microsoft.VisualBasic.Core.dll`, `Microsoft.VisualBasic.dll` |
 | `Microsoft.Win32` | `Microsoft.Win32.Registry.dll`, `System.dll`, `mscorlib.dll` |
 | `Microsoft.Win32.SafeHandles` | `Microsoft.Win32.Registry.dll`, `System.Core.dll`, `System.Diagnostics.Process.dll`, `System.IO.FileSystem.Primitives.dll`, `System.IO.FileSystem.dll`, `System.IO.MemoryMappedFiles.dll`, `System.IO.Pipes.dll`, `System.Private.CoreLib.dll`, `System.Runtime.Handles.dll`, `System.Runtime.dll`, `System.Security.Cryptography.Cng.dll`, `System.Security.Cryptography.X509Certificates.dll`, `System.Security.Cryptography.dll`, `System.Security.Principal.Windows.dll`, `System.dll`, `mscorlib.dll`, `netstandard.dll` |
+| `NAudio.Codecs` | `NAudio.Core.dll` |
+| `NAudio.Dsp` | `NAudio.Core.dll` |
+| `NAudio.Effects` | `NAudio.Core.dll` |
+| `NAudio.Sequencing` | `NAudio.Core.dll` |
+| `NAudio.Sfz` | `NAudio.Core.dll` |
+| `NAudio.SoundFont` | `NAudio.Core.dll` |
+| `NAudio.Utils` | `NAudio.Core.dll` |
+| `NAudio.Wave` | `NAudio.Core.dll` |
+| `NAudio.Wave.SampleProviders` | `NAudio.Core.dll` |
+| `NuGet.Frameworks` | `NuGet.Frameworks.dll` |
+| `NuGet.Versioning` | `NuGet.Versioning.dll` |
+| `StbImageSharp` | `StbImageSharp.dll` |
+| `StbImageWriteSharp` | `StbImageWriteSharp.dll` |
 | `System` | `Microsoft.CodeAnalysis.dll`, `System.AppContext.dll`, `System.ComponentModel.TypeConverter.dll`, `System.ComponentModel.dll`, `System.Console.dll`, `System.Core.dll`, `System.Data.Common.dll`, `System.Globalization.Extensions.dll`, `System.Memory.dll`, `System.Private.CoreLib.dll`, `System.Private.Uri.dll`, `System.Runtime.Extensions.dll`, `System.Runtime.InteropServices.dll`, `System.Runtime.Serialization.Formatters.dll`, `System.Runtime.dll`, `System.Threading.Tasks.dll`, `System.Threading.Thread.dll`, `System.ValueTuple.dll`, `System.dll`, `mscorlib.dll`, `netstandard.dll` |
-| `System.Buffers` | `System.Buffers.dll`, `System.Memory.dll`, `System.Private.CoreLib.dll`, `System.Runtime.dll`, `mscorlib.dll`, `netstandard.dll` |
+| `System.Buffers` | `System.Buffers.dll`, `System.Memory.dll`, `System.Numerics.Tensors.dll`, `System.Private.CoreLib.dll`, `System.Runtime.dll`, `mscorlib.dll`, `netstandard.dll` |
 | `System.Buffers.Binary` | `System.Memory.dll`, `System.Private.CoreLib.dll`, `mscorlib.dll`, `netstandard.dll` |
 | `System.Buffers.Text` | `System.Memory.dll`, `System.Private.CoreLib.dll`, `System.Runtime.dll`, `mscorlib.dll`, `netstandard.dll` |
 | `System.CodeDom` | `System.dll` |
@@ -127,6 +145,7 @@ names are not interchangeable; a `using` directive imports a namespace, not a DL
 | `System.Net.WebSockets` | `System.Net.HttpListener.dll`, `System.Net.WebSockets.Client.dll`, `System.Net.WebSockets.dll`, `System.dll`, `netstandard.dll` |
 | `System.Numerics` | `System.Numerics.Vectors.dll`, `System.Numerics.dll`, `System.Private.CoreLib.dll`, `System.Runtime.Extensions.dll`, `System.Runtime.Numerics.dll`, `System.Runtime.dll`, `mscorlib.dll`, `netstandard.dll` |
 | `System.Numerics.Colors` | `System.Numerics.Vectors.dll`, `System.Private.CoreLib.dll` |
+| `System.Numerics.Tensors` | `System.Numerics.Tensors.dll` |
 | `System.Reflection` | `System.ObjectModel.dll`, `System.Private.CoreLib.dll`, `System.Reflection.DispatchProxy.dll`, `System.Reflection.Extensions.dll`, `System.Reflection.Metadata.dll`, `System.Reflection.Primitives.dll`, `System.Reflection.TypeExtensions.dll`, `System.Reflection.dll`, `System.Runtime.Extensions.dll`, `System.Runtime.InteropServices.dll`, `System.Runtime.dll`, `System.dll`, `mscorlib.dll`, `netstandard.dll` |
 | `System.Reflection.Emit` | `System.Private.CoreLib.dll`, `System.Reflection.Emit.ILGeneration.dll`, `System.Reflection.Emit.Lightweight.dll`, `System.Reflection.Emit.dll`, `System.Reflection.Primitives.dll`, `mscorlib.dll`, `netstandard.dll` |
 | `System.Reflection.Metadata` | `System.Private.CoreLib.dll`, `System.Reflection.Metadata.dll`, `System.Runtime.Loader.dll` |

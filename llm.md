@@ -64,8 +64,9 @@ For all namespace names present in the pinned runtime metadata, see the
 does not guarantee that every type or method works in a browser: OS-dependent APIs
 can throw `PlatformNotSupportedException`. Direct network requests require the remote
 server to allow browser requests (CORS); an optional host relay can forward HTTP. Native processes, arbitrary OS networking,
-registry access and native filesystem watchers are unavailable. There is no
-runtime NuGet installer, ASP.NET server host, or desktop UI framework.
+registry access and native filesystem watchers are unavailable. Additional compatible managed packages can be loaded with the permission-gated
+`await DotnetDide.Nuget.Load("name", "version")` API. There is no full MSBuild/NuGet
+project restore, ASP.NET server host, or desktop UI framework.
 
 ## Build and run workspace files
 
@@ -237,3 +238,49 @@ isolation at the embedding origin/CSP layer when executing untrusted code.
 For disposable resources in script submissions, use `using (...) { ... }` blocks.
 Top-level `using var` declarations are not accepted by the script parser; regular
 compiled `.cs` programs support them.
+
+## Bundled media and optional NuGet packages
+
+StbImageSharp 2.30.16, StbImageWriteSharp 1.16.7, NAudio.Core 3.3.0,
+Concentus 2.2.2 and Concentus.Oggfile 1.0.7 are included by default. They need
+explicit namespace imports but no package downloads or permissions. Use
+`StbImageSharp.ImageResult.FromMemory(bytes, StbImageSharp.ColorComponents.RedGreenBlueAlpha)`
+to decode images, and `new StbImageWriteSharp.ImageWriter().WritePng(rgba, width,
+height, StbImageWriteSharp.ColorComponents.RedGreenBlueAlpha, stream)` to save PNG.
+Qualify ColorComponents because both Stb libraries define it. For WAV use
+`NAudio.Wave.WaveFileWriter(path, new NAudio.Wave.WaveFormat(48000, 16, 1))`
+and `WriteSamples(floatSamples, 0, floatSamples.Length)`. NAudio 3 sample providers
+use `Read(samples.AsSpan())`. Dispose streams before file sync.
+
+For Opus set `Concentus.OpusCodecFactory.AttemptToUseNativeLibrary = false`, create
+an encoder with `OpusCodecFactory.CreateEncoder(48000, 1,
+Concentus.Enums.OpusApplication.OPUS_APPLICATION_AUDIO)`, then create
+`Concentus.Oggfile.OpusOggWriteStream(encoder, stream)`, call `WriteSamples` and
+`Finish()`. Save as `.opus`/`.ogg`, not raw codec packets. PNG/JPEG and WAV preview
+in Lethetic Files; Ogg Opus playback depends on browser support. Desktop audio,
+System.Drawing.Bitmap/Graphics, ImageSharp and SkiaSharp are not bundled.
+
+With host `nugetAccess: true`, first submit:
+
+```csharp
+await DotnetDide.Nuget.Load("Newtonsoft.Json", "13.0.4");
+```
+
+In the **next submission**, use its types or compile files that import them:
+
+```csharp
+Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(new { answer = 42 }));
+```
+
+Load returns Name, Version and Packages; omitting the version reuses an existing
+version or selects the latest stable one. Pin versions for reproducibility.
+Downloads come directly from NuGet.org, independently of general HTTP permission.
+Compatible managed dependencies are resolved; native/build-tool packages and
+conflicting versions fail. No PackageReference restore is performed by Dotnet.Build.
+Exact-version archives are cached in browser Cache Storage, not session files.
+Reload packages after worker restart; cached packages still require permission.
+Do not request NuGet access for the bundled media libraries.
+
+Read [media and package guide](docs/media-and-packages.md) for complete runnable
+image/audio examples, permissions, cache clearing, limits and compatibility.
+The release includes `examples/images.cs` and `examples/audio.cs` in wwwroot.

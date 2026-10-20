@@ -10,7 +10,9 @@ public sealed class Runspace : IDisposable
 {
     // Console and the current directory are runtime-global, including across native test instances.
     private static readonly SemaphoreSlim RuntimeGate = new(1, 1);
-    private readonly MetadataReference[] _references;
+    private readonly List<MetadataReference> _references;
+    private readonly PackageLoader _packages;
+    private readonly HttpClient? _ownedNugetClient;
     private readonly Dictionary<string, Assembly> _assemblies = new(StringComparer.Ordinal);
     private readonly string _id = Guid.NewGuid().ToString("N");
     private readonly RunspaceGlobals _globals;
@@ -20,9 +22,20 @@ public sealed class Runspace : IDisposable
     private bool _disposed;
     public WorkspaceFileSystem Files { get; }
 
-    public Runspace(WorkspaceFileSystem files, IEnumerable<MetadataReference> references)
+    public Runspace(WorkspaceFileSystem files, IEnumerable<MetadataReference> references, bool nugetAccess = false, HttpClient? nugetClient = null)
     {
-        Files = files; _references = references.ToArray();
+        Files = files; _references = references.ToList();
+        _ownedNugetClient = nugetClient is null ? new HttpClient() : null;
+        _packages = new(nugetClient ?? _ownedNugetClient!, _references, additions =>
+        {
+            var metadata = additions.Select(a => MetadataReference.CreateFromImage(a.Bytes)).ToArray();
+            foreach (var addition in additions)
+            {
+                var assembly = Assembly.Load(addition.Bytes);
+                _assemblies[assembly.GetName().Name!] = assembly;
+            }
+            _references.AddRange(metadata);
+        }) { Enabled = nugetAccess };
         _globals = new(new DotnetCommands(Files, _references, assembly => _assemblies[assembly.GetName().Name!] = assembly));
         _states[0] = _globals;
         AppDomain.CurrentDomain.AssemblyResolve += ResolveAssembly;
@@ -62,6 +75,7 @@ public sealed class Runspace : IDisposable
             try
             {
                 Console.SetOut(stdout); Console.SetError(stderr); Directory.SetCurrentDirectory(Files.RootPath);
+                Nuget.Current.Value = _packages;
                 var factory = assembly.GetType("Submission", throwOnError: true)!.GetMethod("<Factory>", BindingFlags.Public | BindingFlags.Static)!;
                 var value = await ((Task<object>)factory.Invoke(null, [_states])!).ConfigureAwait(false);
                 _previous = compilation; _submissions++;
@@ -72,9 +86,15 @@ public sealed class Runspace : IDisposable
                 var cause = error is TargetInvocationException { InnerException: not null } wrapper ? wrapper.InnerException! : error;
                 return new(false, stdout.ToString(), stderr.ToString(), null, diagnostics, new(cause.GetType().FullName!, cause.Message));
             }
-            finally { Console.SetOut(oldOut); Console.SetError(oldError); Directory.SetCurrentDirectory(oldDirectory); }
+            finally { Nuget.Current.Value = null; Console.SetOut(oldOut); Console.SetError(oldError); Directory.SetCurrentDirectory(oldDirectory); }
         }
         finally { if (entered) RuntimeGate.Release(); Interlocked.Decrement(ref _pending); }
+    }
+    public void SetNugetAccess(bool enabled)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (Volatile.Read(ref _pending) != 0) throw new InvalidOperationException("Cannot change permissions on a busy runspace.");
+        _packages.Enabled = enabled;
     }
     public void Reset()
     {
@@ -88,7 +108,7 @@ public sealed class Runspace : IDisposable
         if (_disposed) return;
         if (Volatile.Read(ref _pending) != 0) throw new InvalidOperationException("Cannot dispose a busy runspace.");
         _disposed = true; AppDomain.CurrentDomain.AssemblyResolve -= ResolveAssembly;
-        _assemblies.Clear(); _states = []; _previous = null;
+        _assemblies.Clear(); _states = []; _previous = null; _ownedNugetClient?.Dispose();
     }
     internal sealed class BoundedWriter : StringWriter
     {

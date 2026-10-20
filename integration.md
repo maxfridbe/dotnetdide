@@ -169,3 +169,30 @@ This switch is a capability control, **not a hostile-code security sandbox**:
 arbitrary JS interop/dynamic module imports can reach browser APIs outside these
 wrappers. Run trusted code, keep credentials out of runspaces, and enforce network
 isolation at the embedding origin/CSP layer when executing untrusted code.
+
+## Media defaults and additional NuGet packages
+
+The runtime bundles StbImageSharp/StbImageWriteSharp, NAudio.Core, and
+Concentus/Oggfile. These are available offline after the runtime loads, without
+NuGet permission. Downloadable examples are in `wwwroot/examples/`.
+
+Enable optional package downloads separately from general networking:
+
+```javascript
+import { loadDotnetdide, clearNugetCache } from './dotnetdide.js';
+const runtime = await loadDotnetdide({ nugetAccess: true, networkAccess: false });
+await runtime.runCSharpAsync('await DotnetDide.Nuget.Load("Newtonsoft.Json", "13.0.4");');
+// Use loaded types in the next submission, or in subsequent Dotnet.Build/Run calls.
+await runtime.runCSharpAsync('Newtonsoft.Json.JsonConvert.SerializeObject(new { answer = 42 })');
+await runtime.setNugetAccess(false); // Keep variables/files; deny additional loads.
+await clearNugetCache(); // Clear persistent archives, not already loaded assemblies.
+```
+
+NuGet requests go directly to NuGet.org without browser cookies or relay credentials;
+allow `https://api.nuget.org` in the embedding CSP's `connect-src`. Exact-version
+archives are stored in bounded browser Cache Storage (32 archives / 64 MiB), with
+network fallback if caching is unavailable. They are not included in session snapshots.
+
+See [media and package guide](docs/media-and-packages.md) and [llm.md](llm.md) for
+complete code examples, result types, version/dependency resolution, unsupported
+packages and permission behavior. Serve the bundled guides alongside the SDK.

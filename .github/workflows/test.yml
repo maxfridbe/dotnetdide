@@ -106,6 +106,8 @@ jobs:
 
           Download the versioned ZIP and verify its SHA-256 checksum. Extract it and serve `wwwroot/` over HTTPS or localhost. The archive includes the runtime, editor assets, examples, the optional native .NET HTTP/SOCKS5 relay in `relay/`, `integration.md`, `llm.md`, library inventories and license notices.
 
+          Bundled image/audio libraries generate PNG, JPEG, WAV and Ogg Opus files. Optional `DotnetDide.Nuget.Load` downloads compatible managed packages directly in the browser with a separate permission and bounded persistent Cache Storage. See `docs/media-and-packages.md` for examples, limits and cache controls.
+
           See `docs/networking.md` to configure the relay with allowed origins/targets and an optional upstream SOCKS5 proxy or Tor client. The bridge distribution website is not a proxy.
 
           Workspace programs support `Dotnet.Build()` and `await Dotnet.Run("file.cs")` or a supported `.csproj`. Builds produce managed DLL/PDB artifacts. See `llm.md` for the supported project subset and browser limitations.

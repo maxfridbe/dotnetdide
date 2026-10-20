@@ -39,8 +39,9 @@
         </div>
         <p id="editor-state" class="hint" role="status">Loading Monaco… The plain text editor is ready.</p>
         <div class="toolbar"><button id="run" class="primary">▶ Run C#</button><button id="reset" disabled>Reset variables</button><button id="stop" disabled>Stop worker</button></div>
+        <label class="hint"><input id="nuget-access" type="checkbox"> Allow NuGet.org package downloads (cached in this browser)</label>
         <p id="editor-help" class="hint">Ctrl/⌘ + Enter to run. Variables persist until reset; files remain until the worker stops.</p>
-        <p id="status" role="status" data-state="ready">Ready. First run downloads about 46 MiB of .NET and Roslyn.</p>
+        <p id="status" role="status" data-state="ready">Ready. First run downloads about 40 MiB of .NET and Roslyn.</p>
       </section>
       <section class="result-panel" aria-labelledby="result-title">
         <div class="section-heading"><h2 id="result-title">Result</h2><span id="timing" class="hint"></span></div>
@@ -54,7 +55,7 @@
       </section>
     </div>
   </div>
-  <footer><p>Files and variables live in memory. Export a files snapshot before refreshing. Snapshots contain files, not C# variables. Stop discards the current worker.</p><p><a href="https://github.com/maxfridbe/dotnetdide/blob/master/integration.md">Embedding guide ↗</a><a href="https://github.com/maxfridbe/dotnetdide/blob/master/docs/runtime-assemblies.md">Available libraries ↗</a><a href="llm.md">LLM guide ↗</a><span>No Node.js dependencies.</span></p></footer>
+  <footer><p>Files and variables live in memory. Export a files snapshot before refreshing. Snapshots contain files, not C# variables. Stop discards the current worker.</p><p><a href="https://github.com/maxfridbe/dotnetdide/blob/master/integration.md">Embedding guide ↗</a><a href="https://github.com/maxfridbe/dotnetdide/blob/master/docs/runtime-assemblies.md">Available libraries ↗</a><a href="llm.md">LLM guide ↗</a><a href="docs/media-and-packages.md">Media &amp; NuGet guide ↗</a><a href="examples/images.cs">Image example ↗</a><a href="examples/audio.cs">Audio example ↗</a><span>No Node.js dependencies.</span></p></footer>
 </main>
 <script type="module" src="demo.js"></script>
 </body>

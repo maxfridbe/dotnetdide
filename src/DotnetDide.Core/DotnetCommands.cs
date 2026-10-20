@@ -30,9 +30,9 @@ public sealed class RunspaceGlobals
 public sealed class DotnetCommands
 {
     private readonly WorkspaceFileSystem _files;
-    private readonly MetadataReference[] _references;
+    private readonly IReadOnlyList<MetadataReference> _references;
     private readonly Action<Assembly> _register;
-    internal DotnetCommands(WorkspaceFileSystem files, MetadataReference[] references, Action<Assembly> register)
+    internal DotnetCommands(WorkspaceFileSystem files, IReadOnlyList<MetadataReference> references, Action<Assembly> register)
     { _files = files; _references = references; _register = register; }
 
     public BuildResult Build(string? path = null)

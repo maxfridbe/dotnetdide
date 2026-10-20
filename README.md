@@ -41,21 +41,29 @@ C# files when there is no project. `await Dotnet.Run("app/Demo.csproj")` compile
 and runs a supported SDK-style project. Logs and diagnostics appear in the output;
 generated files appear in the download list. Inspect `build.Success`/`run.Success`.
 This uses Roslyn and a documented project subset; it does not run MSBuild or restore
-NuGet packages. See **[llm.md](llm.md)** for default imports, available namespaces,
+PackageReference items; use the separate Nuget.Load API for additional managed libraries. See **[llm.md](llm.md)** for default imports, available namespaces,
 result fields, project support and guidance for generating programs.
 
 ## Available .NET libraries
 
 See the [full runtime assembly list](docs/runtime-assemblies.md) for the libraries
-included in the pinned .NET 11 build: **185 assembly references**, including
-**164 `System.*` assemblies**. They are already referenced by the C# compiler;
+included in the pinned .NET 11 build: **193 assembly references**, including
+**165 `System.*` assemblies**. They are already referenced by the C# compiler;
 use their namespaces directly in submissions without a separate loading step.
 
 The inventory includes collections, LINQ, JSON, regular expressions, XML,
 compression, HTTP and `System.IO`. File operations use the same virtual filesystem
 as the browser `FS` API. Assembly presence does not guarantee browser support for
 every API; native OS facilities may throw `PlatformNotSupportedException`.
-Additional NuGet packages cannot currently be installed at runtime.
+Media libraries are bundled by default: StbImageSharp/StbImageWriteSharp,
+NAudio.Core and Concentus/Oggfile. Generate PNG/JPEG, WAV and Ogg Opus files
+without installing anything. Additional compatible managed packages can be loaded
+with `await DotnetDide.Nuget.Load("Newtonsoft.Json", "13.0.4")` when the host enables
+`nugetAccess`. Use the loaded types in the next submission. Downloads happen in
+the browser and exact-version archives persist in Cache Storage.
+
+See **[media examples, NuGet permission and caching](docs/media-and-packages.md)**.
+The bundled defaults remain available even when NuGet access is disabled.
 
 ## Browser playground
 
@@ -75,7 +83,7 @@ Monaco 0.57.0 is bundled as prebuilt browser assets (including its workers), so 
 site has no editor CDN dependency and still needs no Node.js/npm build step.
 If Monaco fails to load, a plain text editor remains available.
 
-The first run downloads approximately 46 MiB of runtime/compiler assets. Files and
+The first run downloads approximately 40 MiB of runtime/compiler assets. Files and
 variables are in memory; export a files snapshot before refreshing. You can restore
 files from that snapshot, but variable state is not serialized.
 
@@ -164,14 +172,14 @@ See [integration.md](integration.md) for the API and failure semantics, and
 ## Foundation scope
 
 This is an initial runspace SDK, not a replacement for all Pyodide features.
-There is no runtime NuGet installer, language server, debugger, stdin bridge or
+There is no full MSBuild/NuGet project restore, language server, debugger, stdin bridge or
 automatic IndexedDB persistence yet. Native processes and platform-specific
 .NET APIs are unavailable in browser WebAssembly. Only files are serializable;
 a running C# object graph is not a session snapshot.
 
 The runtime is untrimmed and interpreted so dynamically compiled programs can
-use standard library APIs. The initial static site is about 46 MiB before HTTP
-compression; size optimization comes after compatibility tests. Loaded submission
+use standard library APIs. The runtime/compiler assets are about 40 MiB before HTTP compression, plus
+editor assets and documentation; size optimization follows compatibility tests. Loaded submission
 assemblies cannot be unloaded individually: replace the worker to reclaim them.
 
 Workspace paths are bounded by the file API, but arbitrary C# can access other

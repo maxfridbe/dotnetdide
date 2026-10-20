@@ -66,3 +66,15 @@ GitHub publishing is gated on the successful test job and uses that run's artifa
 Network policy regression: the real browser test first failed because ordinary
 HttpClient reached the server with the default policy. It now checks default denial,
 helper and HttpClient opt-in, revocation, request counts and retained script state.
+
+## Media defaults and optional browser NuGet loading
+
+Media tests first failed with missing Stb/NAudio/Concentus namespaces, then passed
+after adding pinned managed packages. The same source examples run as scripts
+and compiled programs. Real browser checks decode generated PNG/JPEG and WAV/Ogg
+Opus files. NuGet tests cover default denial, invalid IDs, dependency resolution,
+version reuse/conflicts, revocation and rejecting native/build/traversal archives.
+A real WASM test downloads Newtonsoft.Json directly from NuGet.org and uses it in
+submissions and compiled files while general networking stays disabled. Cache
+tests cover exact-version reuse across module reloads, fresh version indexes,
+eviction, size limits, clearing and disabled-storage fallback.

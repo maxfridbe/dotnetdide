@@ -18,7 +18,7 @@ function status(message, state = 'ready') {
   field('status').dataset.state = state;
 }
 function buttons() {
-  for (const id of ['run', 'import', 'check']) field(id).disabled = !!job;
+  for (const id of ['run', 'import', 'check', 'nuget-access']) field(id).disabled = !!job;
   for (const id of ['reset', 'save']) field(id).disabled = !!job || !runtime;
   field('stop').disabled = !job && !runtime;
 }
@@ -84,7 +84,7 @@ async function action(work, { isolated = false } = {}) {
   try {
     if (isolated || !runtime) {
       status('Loading .NET 11 and Roslyn… First load may take a minute.', 'busy');
-      current.runtime = await loadDotnetdide({ signal: current.controller.signal });
+      current.runtime = await loadDotnetdide({ signal: current.controller.signal, nugetAccess: field('nuget-access').checked });
       if (!isolated) runtime = current.runtime;
     } else current.runtime = runtime;
     const message = await work(current.runtime, current.controller.signal);
@@ -97,6 +97,7 @@ async function action(work, { isolated = false } = {}) {
     if (job === current) { job = null; buttons(); }
   }
 }
+field('nuget-access').onchange = () => action(async active => { await active.setNugetAccess(field('nuget-access').checked); return 'NuGet package access ' + (field('nuget-access').checked ? 'enabled' : 'disabled'); });
 field('run').onclick = () => {
   const code = codeEditor.getValue();
   return action(async active => {

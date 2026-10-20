@@ -12,7 +12,7 @@ public static partial class RuntimeBridge
     private static Runspace Current => _runspace ?? throw new InvalidOperationException("Initialize the runtime first.");
 
     [JSExport]
-    public static async Task<string> Initialize(string[] assemblyUrls)
+    public static async Task<string> Initialize(string[] assemblyUrls, bool nugetAccess)
     {
         if (_runspace is not null) throw new InvalidOperationException("Runtime already initialized.");
         using var http = new HttpClient();
@@ -23,11 +23,12 @@ public static partial class RuntimeBridge
             var bytes = await http.GetByteArrayAsync(url);
             references.Add(MetadataReference.CreateFromImage(bytes));
         }
-        _runspace = new(new WorkspaceFileSystem("/home/dotnetdide"), references);
+        _runspace = new(new WorkspaceFileSystem("/home/dotnetdide"), references, nugetAccess);
         return Environment.Version.ToString();
     }
 
     [JSExport] public static async Task<string> Run(string code) => JsonSerializer.Serialize(await Current.RunAsync(code), Json);
+    [JSExport] public static void SetNugetAccess(bool enabled) => Current.SetNugetAccess(enabled);
     [JSExport] public static void Reset() => Current.Reset();
 
     [JSExport]
