@@ -214,3 +214,14 @@ navigation with `frame-src 'self'`. Its separate document CSP allows generated
 code without relaxing the parent script policy. Export session files after mutating
 requests. See [Wire guide](docs/wire.md) for the complete runnable example, lifecycle,
 request limits and supported browser features.
+
+## Optional virtual Network inspector
+
+The playground ships a reusable **TypeScript/Snabbdom** component at
+`playground/network-debugger.js`, with type declarations and
+`network-debugger.css`. Wrap `runtime.requestSite` with `monitor.trace` to observe
+real Wire traffic without changing responses or replaying requests. Pass the
+wrapped method to `createWirePreview` to include iframe requests. The host owns
+the patch loop, layout and runtime permissions. See [component setup and log
+limits](docs/playground.md#reuse-the-snabbdom-component). No Node.js is needed
+when embedding the published modules.

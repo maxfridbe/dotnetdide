@@ -6,7 +6,7 @@ https://github.com/JakeYallop/WasmSharp
 Reference commit: 2f8c93bfa39f2068ad932a748ba23f740075327c
 
 This is a .NET-first adaptation, not an unmodified distribution of WasmSharp.
-It replaces the TypeScript/Comlink/pnpm packaging with .NET projects, C# tests,
+It replaces the Comlink/pnpm runtime packaging with .NET projects, C# tests,
 and a small dependency-free JavaScript loader/worker bridge. The persistent
 submission chain and System.IO workspace API are implemented in this repository.
 
@@ -34,3 +34,13 @@ the pinned SDK's Microsoft.AspNetCore.App 11.0.0-rc.2.26504.105 shared runtime
 (Microsoft/.NET Foundation, MIT). build/aspnet.props records the exact assembly
 set. Kestrel/native hosting and the full ASP.NET runtime pack are not included.
 See docs/licenses/aspnetcore.txt.
+
+The playground UI bundles Snabbdom 3.6.4 (MIT). Its unmodified prebuilt ES modules,
+type declarations and license are in src/DotnetDide.Browser/wwwroot/vendor/snabbdom/.
+Archive provenance and SHA-512 integrity are pinned in build/snabbdom.json;
+docs/licenses/snabbdom-LICENSE contains the upstream notice.
+
+The .NET UI build tool downloads Microsoft's native TypeScript compiler (Apache-2.0).
+build/typescript-native.json pins official platform archives and SHA-512 integrity.
+The compiler is a build-time tool, not part of the browser runtime or release ZIP.
+Its archive includes the upstream LICENSE and notices in the local toolchain cache.

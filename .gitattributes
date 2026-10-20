@@ -1,1 +1,4 @@
 src/DotnetDide.Browser/wwwroot/vendor/** linguist-vendored
+# Preserve upstream license files verbatim, including their final blank line.
+src/DotnetDide.Browser/wwwroot/vendor/snabbdom/LICENSE -whitespace
+docs/licenses/snabbdom-LICENSE -whitespace

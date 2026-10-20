@@ -1,16 +1,18 @@
 # dotnetdide
 
 **[Try it now — C# playground](https://maxfridbe.github.io/dotnetdide/)** ·
-Editable examples, downloadable files and real browser runtime checks.
+Editable examples, downloadable files, real browser checks and a virtual Network debugger.
 
 [![dotnetdide browser playground](docs/images/playground.png)](https://maxfridbe.github.io/dotnetdide/)
 
 A .NET 11 browser runspace with persistent C# submissions and a shared virtual
 filesystem, inspired by [WasmSharp](https://github.com/JakeYallop/WasmSharp).
 
-**No npm, Node.js, TypeScript build, Comlink, or Playwright dependencies.** The
-compiler, runspace, filesystem and tests are .NET. Plain browser JavaScript only
-loads the runtime, carries worker messages and presents the small demo.
+**No npm, Node.js, Comlink, or Playwright dependencies.** The compiler, runspace,
+filesystem and tests are .NET. The playground uses **TypeScript + Snabbdom** and
+Monaco. A .NET build tool invokes the pinned native TypeScript compiler, so building
+the UI also requires no Node.js. The runtime loader/worker bridge remains plain
+browser JavaScript.
 
 ## What works
 
@@ -25,6 +27,7 @@ loads the runtime, carries worker messages and presents the small demo.
 - Build workspace C# files and supported SDK-style projects into downloadable DLL/PDB files.
 - Run compiled programs with arguments, async entry points, build logs and captured output.
 - Host ASP.NET Core middleware/routes on virtual ports with `DotnetDide.Wire` and an isolated interactive iframe.
+- Inspect virtual HTTP requests in a reusable Snabbdom Network debugger: payloads, responses, timings, filtering and export.
 
 ## Build and run saved C# programs
 
@@ -59,6 +62,22 @@ Network and NuGet permissions are independent. The preview supports classic scri
 CSS, media and `fetch`; it has no parent storage access, external requests, module
 imports or WebSockets. See the **[Wire guide](docs/wire.md)** for runnable `.cs` and
 `.csproj` examples, embedding, limits and the tested .NET 11 RC2 JSON workaround.
+
+## Virtual Network debugger
+
+[![Virtual Network debugger inspecting a C# site](docs/images/network-debugger.png)](https://maxfridbe.github.io/dotnetdide/)
+
+The playground's F12-style **Network** panel shows real requests to virtual Wire
+ports, including iframe assets, GET/POST calls, errors and isolated runtime checks.
+Select a row for headers, payload, response and timing. Filter requests, pause
+recording, preserve or export the log, and dock the resizable panel at the bottom
+or right. **Alt+N** toggles it; F12 works when the browser passes that key through.
+
+This is a virtual HTTP inspector, not a C# breakpoint debugger. External HTTP and
+runtime downloads remain in the browser's own developer tools. Captures stay in
+memory with bounded body previews and credential-header redaction.
+See the **[playground and component guide](docs/playground.md)** for controls,
+limits and reuse of the standalone TypeScript/Snabbdom component.
 
 ## Available .NET libraries
 
@@ -97,7 +116,8 @@ the current code; Ctrl+M toggles whether Tab indents or moves focus. C# semantic
 IntelliSense and automatic formatting are not provided by this integration.
 Monaco 0.57.0 is bundled as prebuilt browser assets (including its workers), so the
 site has no editor CDN dependency and still needs no Node.js/npm build step.
-If Monaco fails to load, a plain text editor remains available.
+If Monaco fails to load, a plain text editor remains available. The surrounding UI
+and virtual debugger are Snabbdom components; editor state survives UI updates.
 
 The first run downloads approximately 40 MiB of runtime/compiler assets. Files and
 variables are in memory; export a files snapshot before refreshing. You can restore
@@ -121,6 +141,10 @@ dotnet publish src/DotnetDide.Browser -c Release -o artifacts/site --no-restore
 CHROME_BIN=/path/to/chrome dotnet test tests/DotnetDide.Browser.Tests --no-restore
 dotnet run --project tools/DotnetDide.Server -- artifacts/site/wwwroot 5080
 ```
+
+The first publish downloads the SHA-512-verified native TypeScript compiler pinned
+in `build/typescript-native.json` and caches it in `.toolchain/typescript`.
+See the [UI build guide](docs/playground.md#build-without-nodejs).
 
 Open **http://localhost:5080** to try the C# runspace. Any static HTTPS host can
 serve `artifacts/site/wwwroot`; no application server is needed for execution.
@@ -188,7 +212,7 @@ See [integration.md](integration.md) for the API and failure semantics, and
 ## Foundation scope
 
 This is an initial runspace SDK, not a replacement for all Pyodide features.
-There is no full MSBuild/NuGet project restore, language server, debugger, stdin bridge or
+There is no full MSBuild/NuGet project restore, language server, C# breakpoint debugger, stdin bridge or
 automatic IndexedDB persistence yet. Native processes and platform-specific
 .NET APIs are unavailable in browser WebAssembly. Only files are serializable;
 a running C# object graph is not a session snapshot.
@@ -210,6 +234,8 @@ untrusted code. The native core test library executes trusted test code only.
 - `tests/DotnetDide.Core.Tests`: native semantic and filesystem tests.
 - `tests/DotnetDide.Browser.Tests`: real Chromium/WASM acceptance, driven by .NET.
 - `tools/DotnetDide.Server`: optional .NET static development server.
+- `tools/DotnetDide.WebBuild`: .NET tool that downloads and invokes native TypeScript.
+- `src/DotnetDide.Browser/wwwroot/playground`: typed Snabbdom UI, Monaco adapter, virtual Network component.
 
 WasmSharp's runtime-assembly metadata and in-memory compiler approach provided
 the starting point; this repository supplies the persistent runspace and filesystem

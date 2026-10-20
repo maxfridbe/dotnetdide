@@ -5,4 +5,5 @@
   <Project Path="tests/DotnetDide.Browser.Tests/DotnetDide.Browser.Tests.csproj" />
   <Project Path="tools/DotnetDide.Server/DotnetDide.Server.csproj" />
   <Project Path="tools/DotnetDide.Relay/DotnetDide.Relay.csproj" />
+  <Project Path="tools/DotnetDide.WebBuild/DotnetDide.WebBuild.csproj" />
 </Solution>

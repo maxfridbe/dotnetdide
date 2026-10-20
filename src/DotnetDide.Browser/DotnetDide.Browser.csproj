@@ -4,12 +4,28 @@
   <PublishTrimmed>false</PublishTrimmed><WasmBuildNative>false</WasmBuildNative>
   <WasmEnableWebcil>false</WasmEnableWebcil><WasmFingerprintAssets>false</WasmFingerprintAssets><CompressionEnabled>false</CompressionEnabled>
   <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+  <DotNetHostPath Condition="'$(DotNetHostPath)' == ''">dotnet</DotNetHostPath>
+  <!-- WebBuild is a native build tool, never a browser runtime dependency. -->
+  <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
 </PropertyGroup>
-<ItemGroup><Compile Remove="wwwroot/examples/**/*.cs" /></ItemGroup>
+<ItemGroup>
+  <Compile Remove="wwwroot/examples/**/*.cs" />
+  <Content Remove="wwwroot/playground/**/*.ts" />
+  <ProjectReference Include="../../tools/DotnetDide.WebBuild/DotnetDide.WebBuild.csproj" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="RuntimeIdentifier;SelfContained" />
+</ItemGroup>
+<Target Name="CompilePlayground" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolveProjectReferences">
+  <Exec Command="&quot;$(DotNetHostPath)&quot; &quot;$(MSBuildProjectDirectory)/../../tools/DotnetDide.WebBuild/bin/$(Configuration)/net11.0/DotnetDide.WebBuild.dll&quot; &quot;$(MSBuildProjectDirectory)&quot; &quot;$(IntermediateOutputPath)playground&quot;" />
+  <ItemGroup>
+    <_PlaygroundOutput Include="$(IntermediateOutputPath)playground/**/*" />
+    <Content Include="@(_PlaygroundOutput)" Link="wwwroot/playground/%(_PlaygroundOutput.RecursiveDir)%(_PlaygroundOutput.Filename)%(_PlaygroundOutput.Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Target>
 <ItemGroup><ProjectReference Include="../DotnetDide.Core/DotnetDide.Core.csproj" /></ItemGroup>
 <ItemGroup>
   <Content Include="../../docs/media-and-packages.md" Link="wwwroot/docs/media-and-packages.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   <Content Include="../../docs/licenses/**/*" Link="wwwroot/docs/licenses/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  <Content Include="../../docs/images/**/*" Link="wwwroot/docs/images/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  <Content Include="../../docs/playground.md" Link="wwwroot/docs/playground.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   <Content Include="../../docs/wire.md" Link="wwwroot/docs/wire.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   <Content Include="../../docs/networking.md" Link="wwwroot/docs/networking.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   <Content Include="../../llm.md" Link="wwwroot/llm.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

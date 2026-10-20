@@ -329,3 +329,15 @@ Read [the complete Wire guide](docs/wire.md) and the executable
 [notebook sample](https://github.com/maxfridbe/dotnetdide/blob/master/src/DotnetDide.Browser/wwwroot/examples/site.cs) before generating a site. They cover .cs and
 .csproj creation, compilation, static files, JSON, embedding and limits. In the
 repository the executable sample is at `src/DotnetDide.Browser/wwwroot/examples/site.cs`.
+
+## Playground virtual network debugging
+
+The playground includes a Network panel implemented as a TypeScript/Snabbdom
+component. Enable Interactive sites, run a Wire program, and Open / Reload its
+virtual port. Requests from the iframe appear automatically. Headers, Payload,
+Response and Timing show what reached the C# route and what it returned; error
+filters help find 4xx/5xx responses. The panel does not observe outbound HttpClient
+traffic or provide C# breakpoints. Use browser developer tools for external HTTP.
+The host can export a bounded JSON capture for debugging. Known credential headers
+and query parameters are redacted; request/response bodies can still contain user
+data. See [the playground guide](docs/playground.md).

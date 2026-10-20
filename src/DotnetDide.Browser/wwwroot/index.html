@@ -3,69 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Try C# and .NET 11 in your browser: live examples, a virtual filesystem and real WebAssembly runtime checks.">
+  <meta name="description" content="Run C# and .NET 11 in your browser. Edit with Monaco, host interactive sites, and inspect virtual HTTP in the Network debugger.">
   <meta http-equiv="Content-Security-Policy" content="frame-src 'self'; object-src 'none'; base-uri 'self'">
   <title>dotnetdide · C# playground</title>
   <link rel="stylesheet" href="demo.css">
 </head>
 <body>
-<main>
-  <header>
-    <div class="brand"><a href="./">dotnet<span>dide</span><span class="badge">.NET 11 RC2</span></a><a class="source" href="https://github.com/maxfridbe/dotnetdide">Source ↗</a></div>
-    <p class="eyebrow">C# · WEBASSEMBLY · IN YOUR BROWSER</p>
-    <h1>A little .NET lab.<br><span>A real runtime.</span></h1>
-    <p class="intro">Write C#, keep variables between runs, and create files you can download. Compilation and execution happen locally in a browser worker.</p>
-  </header>
-  <div class="workspace">
-    <aside aria-labelledby="examples-title">
-      <h2 id="examples-title">Explore the examples</h2>
-      <nav id="examples" aria-label="Code examples"></nav>
-      <div class="checks-panel">
-        <h2>Does it work here?</h2>
-        <p>Run every example with assertions in a separate workspace. Includes an isolated local site test. Your editor and files stay intact.</p>
-        <button id="check">Run all checks</button>
-        <p id="check-summary" role="status">11 examples · real .NET execution</p>
-        <ol id="checks" aria-label="Check results"></ol>
-      </div>
-    </aside>
-    <div class="lab">
-      <section class="editor-panel" aria-labelledby="example-title">
-        <div class="section-heading"><h2 id="example-title">Create a file</h2><span class="badge">Editable C#</span></div>
-        <p id="description"></p><p id="expected" class="expected"></p>
-        <div id="steps" role="group" aria-label="Example steps"></div>
-        <label class="sr-only" for="code">C# submission</label>
-        <div id="code-editor">
-        <div id="monaco" hidden></div>
-        <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-describedby="editor-help"></textarea>
-        </div>
-        <p id="editor-state" class="hint" role="status">Loading Monaco… The plain text editor is ready.</p>
-        <div class="toolbar"><button id="run" class="primary">▶ Run C#</button><button id="reset" disabled>Reset variables</button><button id="stop" disabled>Stop worker</button></div>
-        <label class="hint"><input id="site-access" type="checkbox"> Allow interactive sites (virtual ports and isolated iframe)</label>
-        <label class="hint"><input id="nuget-access" type="checkbox"> Allow NuGet.org package downloads (cached in this browser)</label>
-        <p id="editor-help" class="hint">Ctrl/⌘ + Enter to run. Variables persist until reset; files remain until the worker stops.</p>
-        <p id="status" role="status" data-state="ready">Ready. First run downloads about 40 MiB of .NET and Roslyn.</p>
-      </section>
-      <section class="result-panel" aria-labelledby="result-title">
-        <div class="section-heading"><h2 id="result-title">Result</h2><span id="timing" class="hint"></span></div>
-        <pre id="result" tabindex="0">Choose an example, edit it, and press Run C#.</pre>
-        <details><summary>Raw result / diagnostics</summary><pre id="output" tabindex="0">No submissions yet.</pre></details>
-      </section>
-      <section class="site-panel" aria-labelledby="site-title">
-        <h2 id="site-title">Interactive sites</h2>
-        <p id="site-status" role="status">Enable Interactive sites, then run the site example.</p>
-        <div class="toolbar"><label>Virtual port <select id="site-port"></select></label><label>Path <input id="site-path" value="/"></label><button id="site-open" disabled>Open / Reload</button><button id="site-stop" disabled>Stop site</button></div>
-        <iframe id="site-frame" title="Interactive C# site" sandbox="allow-scripts allow-forms" referrerpolicy="no-referrer" hidden></iframe>
-        <p class="hint">Classic scripts and fetch to C# routes. No external networking, ES modules, WebSockets or parent-page access. <a href="docs/wire.md">Wire guide</a> · <a href="examples/site.cs">Download sample C#</a></p>
-      </section>
-      <section class="files-panel" aria-labelledby="files-title">
-        <div class="section-heading"><h2 id="files-title">Workspace files <span id="file-count">(0)</span></h2><button id="save" disabled>Export snapshot</button></div>
-        <ul id="files"><li class="hint">No files yet. Try “Create a file”.</li></ul>
-        <label class="upload" for="import">Restore a files snapshot<input id="import" type="file" accept="application/json,.json"></label>
-      </section>
-    </div>
-  </div>
-  <footer><p>Files and variables live in memory. Export a files snapshot before refreshing. Snapshots contain files, not C# variables. Stop discards the current worker.</p><p><a href="https://github.com/maxfridbe/dotnetdide/blob/master/integration.md">Embedding guide ↗</a><a href="https://github.com/maxfridbe/dotnetdide/blob/master/docs/runtime-assemblies.md">Available libraries ↗</a><a href="llm.md">LLM guide ↗</a><a href="docs/media-and-packages.md">Media &amp; NuGet guide ↗</a><a href="examples/images.cs">Image example ↗</a><a href="examples/audio.cs">Audio example ↗</a><span>No Node.js dependencies.</span></p></footer>
-</main>
-<script type="module" src="demo.js"></script>
+  <div id="app"><p class="loading">Loading the C# playground…</p></div>
+  <noscript>This playground needs JavaScript to run .NET WebAssembly.</noscript>
+  <script type="module" src="playground/demo.js"></script>
 </body>
 </html>
