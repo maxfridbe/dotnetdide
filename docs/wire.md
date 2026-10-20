@@ -96,6 +96,26 @@ are rejected. Cookies, authorization and transport framing headers are not impor
 from the iframe, and `Set-Cookie` is removed from responses. Keep application
 state in the worker or session files rather than browser cookies.
 
+## External APIs from site routes
+
+A page can call `fetch('/api/weather')` and have that C# route call an external
+API using ordinary `System.Net.Http.HttpClient`. Enable both `siteAccess` and
+`networkAccess`. Site permission alone authorizes only the virtual server and
+preview; a disabled network permission produces “Network access is disabled by
+the host”. Direct C# HTTP still obeys destination CORS. Preview JavaScript cannot
+fetch external URLs directly, even when the C# network permission is enabled.
+
+In Lethetic, enable **Network access** under **Connections → Runtime & security**,
+then run the saved site file again: changing this setting restarts its .NET worker.
+Files and chat remain in the session. The standalone SDK instead allows
+`await runtime.setNetworkAccess(true)` while idle without replacing the worker.
+
+Preserve the original exception details when diagnosing a failure. A generic
+fetch error does not distinguish CORS, connectivity, or remote service failures;
+do not replace every such error with a claim about an ad blocker. Use
+`context.RequestAborted` for outbound calls; the entire route has a 15-second
+cooperative deadline, including multiple sequential API calls.
+
 ## JavaScript embedding
 
 ```js

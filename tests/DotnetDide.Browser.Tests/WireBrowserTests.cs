@@ -38,6 +38,60 @@ public sealed class WireBrowserTests
         await browser.EvaluateAsync("wirePreview.destroy();await wire.setSiteAccess(false);if((await wire.listSites()).length)throw Error('Site survived revocation');wire.terminate();");
     }
     [Fact]
+    public async Task SiteHttpClientObeysNetworkPermissionAfterRegistration()
+    {
+        await using var browser = new BrowserHarness(); await browser.StartAsync();
+        await browser.EvaluateAsync("""
+            globalThis.siteNet = await api.loadDotnetdide({siteAccess:true});
+            // A different hostname exercises browser CORS, not just same-origin HTTP.
+            const endpoint = new URL('/network-probe', location.origin);
+            endpoint.hostname = 'localhost';
+            const source = `
+                using System.Net.Http;
+                using DotnetDide;
+                using Microsoft.AspNetCore.Builder;
+                using Microsoft.AspNetCore.Http;
+                var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+                http.DefaultRequestHeaders.Add("User-Agent", "zip-weather-demo");
+                var app = Wire.CreateApplication();
+                app.UseRouting();
+                app.UseEndpoints(routes => routes.MapGet("/api/weather", async context => {
+                    try {
+                        using var response = await http.GetAsync(${JSON.stringify(endpoint.href)}, context.RequestAborted);
+                        await context.Response.WriteAsync(await response.Content.ReadAsStringAsync());
+                    } catch (Exception error) {
+                        context.Response.StatusCode = 502;
+                        await context.Response.WriteAsync(error.ToString());
+                    }
+                }));
+                await Wire.ListenAsync(8080, app);`;
+            // Compile the file just as Lethetic's Files > Run does.
+            await siteNet.FS.writeFile('weather.cs', source);
+            const started = await siteNet.runCSharpAsync('var result = await Dotnet.Run("weather.cs"); if (!result.Success) throw new Exception(result.Error?.Message);');
+            if (!started.success) throw Error(JSON.stringify(started));
+            globalThis.weather = async () => {
+                const response = await siteNet.requestSite({port:8080,method:'GET',path:'/api/weather'});
+                return {status:response.status,body:atob(response.body)};
+            };
+            """);
+        var blocked = await browser.EvaluateAsync("return await weather();");
+        Assert.Equal(502, blocked.GetProperty("status").GetInt32());
+        Assert.Contains("Network access is disabled", blocked.GetProperty("body").GetString());
+        Assert.Equal(0, browser.NetworkRequests);
+        await browser.EvaluateAsync("await siteNet.setNetworkAccess(true);");
+        var allowed = await browser.EvaluateAsync("return await weather();");
+        Assert.Equal(200, allowed.GetProperty("status").GetInt32());
+        Assert.Equal("network-ok", allowed.GetProperty("body").GetString());
+        Assert.Equal(1, browser.NetworkRequests);
+        await browser.EvaluateAsync("await siteNet.setNetworkAccess(false);");
+        var revoked = await browser.EvaluateAsync("return await weather();");
+        Assert.Equal(502, revoked.GetProperty("status").GetInt32());
+        Assert.Contains("Network access is disabled", revoked.GetProperty("body").GetString());
+        Assert.Equal(1, browser.NetworkRequests);
+        await browser.EvaluateAsync("siteNet.terminate();");
+    }
+
+    [Fact]
     public async Task PlaygroundOffersSiteExamplePermissionPreviewAndStop()
     {
         await using var browser = new BrowserHarness(); await browser.StartAsync();
