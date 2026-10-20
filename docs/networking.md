@@ -27,6 +27,7 @@ using System.Net.Http;
 using Dotnetdide;
 using (var request = new HttpRequestMessage(HttpMethod.Patch, "https://api.example/items/42"))
 {
+    // Only if this API requires X-Client and allows it in its CORS preflight.
     request.Headers.Add("X-Client", "dotnetdide");
     request.Content = new StringContent("{\"done\":true}", System.Text.Encoding.UTF8, "application/json");
     using (var response = await Net.SendAsync(request, new BrowserRequestOptions
@@ -52,13 +53,30 @@ must be CORS-exposed by the destination to be readable. `no-cors` is deliberatel
 rejected because opaque responses cannot be read. Manual cross-origin redirects
 can also produce unreadable opaque responses. There is no CORS bypass flag.
 
-### User-Agent and browser differences
+### Errata: custom HTTP request headers
 
 Leave `User-Agent` to the browser for direct requests. Avoid desktop-style code
 such as `http.DefaultRequestHeaders.Add("User-Agent", "my-app")`: Firefox may
 preflight that non-safelisted header, and the destination may reject it. Chrome
 can silently drop a custom User-Agent instead, so a Chrome-only test can miss the
 failure. See [MDN's User-Agent note](https://developer.mozilla.org/en-US/docs/Glossary/Forbidden_request_header).
+
+Custom headers are supported when the destination permits them. Earlier examples
+using `X-Client` assume the server approves that header and the request method;
+they do not establish that arbitrary APIs accept extra headers.
+
+- Add only API-required headers, preferably per `HttpRequestMessage` instead of
+  shared `DefaultRequestHeaders` across unrelated endpoints.
+- `Authorization`, `X-*` headers and JSON Content-Type can require a preflight.
+  The destination must approve the origin, method and requested headers.
+  `Authorization` must be explicitly named in Access-Control-Allow-Headers.
+- Avoid Content-Type on a bodyless GET. Leave `Host`, `Origin`, `Cookie` and
+  `Content-Length` to the browser.
+- Access-Control-Allow-* belongs in server responses; adding it to a request
+  does not grant access. Network permission and `no-cors` cannot bypass CORS.
+
+See [CORS header rules](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_request_header)
+and [server header approval](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Access-Control-Allow-Headers).
 
 This was reproduced with a compiled Wire route called from the opaque iframe:
 Open-Meteo's geocoding request failed in Firefox with the custom User-Agent and

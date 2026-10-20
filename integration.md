@@ -160,6 +160,9 @@ mixed-content rules. The host can configure `relay: { endpoint, token }` for an
 optional native .NET HTTP relay with SOCKS5 support; ordinary `HttpClient` uses it
 too. The relay is included in release ZIPs under `relay/`. See
 [HTTP methods, browser options, relay and Tor setup](docs/networking.md).
+Before adding custom request headers, read the
+[header errata](docs/networking.md#errata-custom-http-request-headers), including
+Firefox preflight failures caused by User-Agent and API-specific header approval.
 `bridges.torproject.org` supplies Tor bridge addresses; it is not a proxy endpoint.
 Raw `System.Net.Sockets` and `HttpClientHandler.Proxy` remain unsupported in WASM;
 `Net.OpenReadAsync` exposes HTTP as an async `System.IO.Stream`.

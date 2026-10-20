@@ -220,7 +220,7 @@ var reply = await Dotnetdide.Net.PostJsonAsync("https://example.org/api", new { 
 ```
 
 Use the exact capitalization `Dotnetdide.Net`. `System.Net.Http` is available
-with an explicit `using` in scripts. Await network I/O. For direct browser requests, do not set User-Agent; let the browser supply it. A custom User-Agent can trigger a rejected CORS preflight in Firefox while Chrome silently drops it. Preserve original fetch error details and check API response content, not just HTTP success. Direct HTTP obeys destination CORS and browser
+with an explicit `using` in scripts. Await network I/O. Direct HTTP obeys destination CORS and browser
 mixed-content rules. The host can configure `relay: { endpoint, token }` for an
 optional native .NET HTTP relay with SOCKS5 support; ordinary `HttpClient` uses it
 too. The relay is included in release ZIPs under `relay/`. See
@@ -229,6 +229,18 @@ too. The relay is included in release ZIPs under `relay/`. See
 Raw `System.Net.Sockets` and `HttpClientHandler.Proxy` remain unsupported in WASM;
 `Net.OpenReadAsync` exposes HTTP as an async `System.IO.Stream`.
 Native .NET runspace hosts must supply their own network policy.
+
+### Errata: custom HTTP request headers
+
+For direct browser HTTP, do not set `User-Agent`: Firefox may preflight it while
+Chrome silently drops it. Leave `Host`, `Origin`, `Cookie` and `Content-Length`
+to the browser too. Add only API-required custom headers, preferably on each
+`HttpRequestMessage`. `Authorization`, `X-*` headers and JSON Content-Type can
+require CORS preflight approval; avoid Content-Type on bodyless GETs.
+Access-Control-Allow-* is a server response setting, not a client workaround.
+Neither Network access nor `no-cors` overrides destination policy. Preserve
+original exceptions, test the affected browser and validate response content.
+See [the header errata and corrected example](docs/networking.md#errata-custom-http-request-headers).
 
 This switch is a capability control, **not a hostile-code security sandbox**:
 arbitrary JS interop/dynamic module imports can reach browser APIs outside these
