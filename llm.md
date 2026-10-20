@@ -220,7 +220,7 @@ var reply = await Dotnetdide.Net.PostJsonAsync("https://example.org/api", new { 
 ```
 
 Use the exact capitalization `Dotnetdide.Net`. `System.Net.Http` is available
-with an explicit `using` in scripts. Await network I/O. Direct HTTP obeys destination CORS and browser
+with an explicit `using` in scripts. Await network I/O. For direct browser requests, do not set User-Agent; let the browser supply it. A custom User-Agent can trigger a rejected CORS preflight in Firefox while Chrome silently drops it. Preserve original fetch error details and check API response content, not just HTTP success. Direct HTTP obeys destination CORS and browser
 mixed-content rules. The host can configure `relay: { endpoint, token }` for an
 optional native .NET HTTP relay with SOCKS5 support; ordinary `HttpClient` uses it
 too. The relay is included in release ZIPs under `relay/`. See

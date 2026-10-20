@@ -52,6 +52,21 @@ must be CORS-exposed by the destination to be readable. `no-cors` is deliberatel
 rejected because opaque responses cannot be read. Manual cross-origin redirects
 can also produce unreadable opaque responses. There is no CORS bypass flag.
 
+### User-Agent and browser differences
+
+Leave `User-Agent` to the browser for direct requests. Avoid desktop-style code
+such as `http.DefaultRequestHeaders.Add("User-Agent", "my-app")`: Firefox may
+preflight that non-safelisted header, and the destination may reject it. Chrome
+can silently drop a custom User-Agent instead, so a Chrome-only test can miss the
+failure. See [MDN's User-Agent note](https://developer.mozilla.org/en-US/docs/Glossary/Forbidden_request_header).
+
+This was reproduced with a compiled Wire route called from the opaque iframe:
+Open-Meteo's geocoding request failed in Firefox with the custom User-Agent and
+succeeded after removing it. Keep the original exception message when diagnosing
+fetch failures; a successful network self-test does not establish that every API
+accepts your program's headers. Also validate response content: a successful HTTP
+status may still contain no location matching a ZIP code.
+
 ## Optional native .NET relay
 
 A browser cannot open raw SOCKS/TCP connections or set `HttpClientHandler.Proxy`.
