@@ -51,6 +51,28 @@ public sealed class DebugInfoTests
     }
 
     [Fact]
+    public async Task PlaygroundDumpsDebugDataWithoutRecordingItsOwnOutput()
+    {
+        await using var browser = new BrowserHarness(); await browser.StartAsync();
+        await browser.EvaluateAsync("document.querySelector('#run').click();");
+        await browser.WaitForAsync("!document.querySelector('#run').disabled && document.querySelector('#status').textContent.includes('Ready')");
+        Assert.True((await browser.EvaluateAsync("""
+            const assert=(ok,message)=>{if(!ok)throw Error(message)};
+            document.querySelector('#dump-logs').click(); await Promise.resolve();
+            const first=document.querySelector('#result').textContent;
+            const snapshot=JSON.parse(first);
+            assert(snapshot.console.some(row=>row.message.includes('Saved outputs/answer.txt')),'Missing C# output');
+            assert(snapshot.assemblies.length>0&&Array.isArray(snapshot.network),'Incomplete snapshot');
+            document.querySelector('#dump-logs').click(); await Promise.resolve();
+            assert(document.querySelector('#result').textContent===first,'Dump recorded itself');
+            document.querySelector('#stop').click();document.querySelector('#dump-logs').click(); await Promise.resolve();
+            assert(document.querySelector('#result').textContent===first,'Stop lost snapshot');
+            assert(document.querySelector('#output').textContent===first,'Raw snapshot differs');
+            return true;
+            """)).GetBoolean());
+    }
+
+    [Fact]
     public async Task RuntimeIframeAndCSharpShareDebugSnapshots()
     {
         await using var browser = new BrowserHarness(); await browser.StartAsync();

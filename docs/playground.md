@@ -30,7 +30,14 @@ NuGet loads; the snapshot remains available after stopping a worker.
 The **Debug your application** example demonstrates `Dotnet.GetDebugInfo()` in a
 later C# submission and saves `debug-info.json` in workspace files. The JavaScript
 host can read live snapshots using `runtime.GetDebugInfo()` / `getDebugInfo()`.
-Both APIs read the same store used by this UI. See [llm.md](../llm.md#debug-your-own-application)
+Both APIs read the same store used by this UI. Step 2 prints console messages,
+stack traces, virtual requests and an assembly count to the **Output** terminal.
+Click **Dump logs** beside Output to print a complete JSON snapshot without
+running C#, changing the editor, or starting/resetting a worker. It works while
+running and after Stop, includes all captured entries regardless of panel filters,
+and does not record its own dump back into the log. Raw result / diagnostics shows
+the same JSON; **Console → Export debug info** downloads it. A web page cannot
+write to a native OS terminal; C# uses `Console.WriteLine` for captured output. See [llm.md](../llm.md#debug-your-own-application)
 for a complete self-debugging recipe and schema. Console capture is diagnostic
 output, not a JavaScript REPL or access to native browser developer tools.
 

@@ -100,6 +100,15 @@ function run(): void {
     return result.success ? undefined : "Submission failed. See the diagnostics below. Ready for another run.";
   });
 }
+function dumpLogs(): void {
+  // Read the same store as the debugger, even after Stop. Do not record this
+  // dump back into it: repeated dumps must not recursively grow the log.
+  const snapshot = network.diagnostics.snapshot();
+  rawResult = JSON.stringify(snapshot, null, 2);
+  resultText = rawResult;
+  timing = `${snapshot.console.length} console messages · ${snapshot.network.length} requests · ${snapshot.assemblies.length} assemblies`;
+  changed();
+}
 function stop(): void {
   clearPreview(); sites = []; sitePort = ""; siteStatus = "Worker stopped.";
   const current = job; job = null;
@@ -242,7 +251,8 @@ function view(): VNode {
             h("p#status", {attrs: {role: "status", "data-state": state}}, statusText),
           ]),
           h("section.result-panel.panel", {attrs: {"aria-labelledby": "result-title"}}, [
-            h("div.section-heading", [h("h2#result-title", "Output"), h("span#timing.hint", timing)]),
+            h("div.section-heading", [h("h2#result-title", "Output"), h("span#timing.hint", timing),
+              button("dump-logs", "Dump logs", false, dumpLogs)]),
             h("pre#result", {attrs: {tabindex: "0"}}, resultText),
             h("details", [h("summary", "Raw result / diagnostics"), h("pre#output", {attrs: {tabindex: "0"}}, rawResult)]),
           ]),

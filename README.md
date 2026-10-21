@@ -32,7 +32,7 @@ browser JavaScript.
 - Inspect virtual HTTP requests and C#/iframe console output in reusable Snabbdom DevTools: filtering, stack traces and JSON export.
 - Load compatible managed NuGet packages with permission-gated JavaScript `runtime.LoadNuget(name, version)` or C# `DotnetDide.Nuget.Load(name, version)`.
 - Inspect loaded .NET assembly names and versions, including downloaded NuGet assemblies.
-- Debug your own application with JavaScript `runtime.GetDebugInfo()` or C# submission `Dotnet.GetDebugInfo()`; see [the debugging recipe](llm.md#debug-your-own-application).
+- Debug your own application with JavaScript `runtime.GetDebugInfo()` or C# submission `Dotnet.GetDebugInfo()`; use **Dump logs** to print the debugger snapshot to playground Output. The **Debug your application** example prints logs and saves JSON; see [the debugging recipe](llm.md#debug-your-own-application).
 
 ## Build and run saved C# programs
 

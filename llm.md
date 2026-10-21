@@ -47,6 +47,15 @@ compiled `.cs` / `.csproj` programs do not have that globals object. Use a subse
 interactive submission to inspect those programs. Native hosts must explicitly
 supply the optional Runspace `getDebugInfo` callback; unsupported hosts throw.
 
+For a quick complete dump in a later submission, use
+`Console.WriteLine(Dotnet.GetDebugInfo());`. The playground's **Debug your application**
+example also prints readable log lines, stack traces, virtual requests and an
+assembly count, then saves the full JSON. **Dump logs** beside **Output** prints
+the current host snapshot without running C#; it works after stopping the worker
+and does not feed the dump back into the log. This Output terminal is captured
+browser output, not an OS shell. Repeated C# dumps do become new captured output;
+prefer filtering the snapshot and saving JSON for large diagnostic histories.
+
 For JavaScript embedding, the equivalent is a synchronous detached object:
 
 ```js

@@ -146,16 +146,26 @@ packageJson`],
   },
   {
     id: 'debug', title: 'Debug your application', category: 'CONSOLE · DIAGNOSTICS',
-    description: 'Run step 1 to write output, then step 2 to read the same diagnostics shown by DevTools. Open the Console tab for logs.',
-    expected: 'Saves debug-info.json with network requests and console messages from earlier operations.',
+    description: 'Run step 1, then step 2 to print captured console messages and virtual HTTP requests to Output and save the full snapshot. Dump logs reads the same debugger data without executing C#.',
+    expected: 'Prints earlier logs and requests, counts loaded assemblies, and saves debug-info.json. Host a site and interact with it first to include iframe activity.',
     steps: ['Console.WriteLine("Debug sample output");', `using System.Text.Json;
 var debugJson = Dotnet.GetDebugInfo();
 File.WriteAllText("debug-info.json", debugJson);
-int debugCount;
 using (var debugDocument = JsonDocument.Parse(debugJson))
-    debugCount = debugDocument.RootElement.GetProperty("console").GetArrayLength();
-debugCount`],
-    verify: async (_results, runtime) => JSON.parse(await runtime.FS.readFile('debug-info.json', {encoding:'utf8'})).console
+{
+    var root = debugDocument.RootElement;
+    foreach (var entry in root.GetProperty("console").EnumerateArray())
+    {
+        Console.WriteLine($"[{entry.GetProperty("level")}] {entry.GetProperty("source")}: {entry.GetProperty("message")}");
+        if (entry.TryGetProperty("stack", out var stack)) Console.WriteLine(stack.GetString());
+    }
+    foreach (var request in root.GetProperty("network").EnumerateArray())
+        Console.WriteLine($"{request.GetProperty("method")} :{request.GetProperty("port")}{request.GetProperty("path")} → {request.GetProperty("status")} {request.GetProperty("error")}");
+    Console.WriteLine($"Loaded assemblies: {root.GetProperty("assemblies").GetArrayLength()}");
+    Console.WriteLine($"Dropped entries: {root.GetProperty("dropped")}");
+}
+Console.WriteLine("Saved debug-info.json");`],
+    verify: async (results, runtime) => results[1]!.stdout.includes('Debug sample output') && results[1]!.stdout.includes('Loaded assemblies:') && JSON.parse(await runtime.FS.readFile('debug-info.json', {encoding:'utf8'})).console
       .some((entry: {message: string}) => entry.message.includes('Debug sample output')),
   },
   {
