@@ -53,6 +53,32 @@ export class VirtualNetworkLog {
   clear(): void { this.entries.length = 0; this.dropped = 0; this.emit(); }
   beginRunspace(): void { if (!this.preserve) this.clear(); }
   snapshot(): NetworkEntry[] { return structuredClone(this.entries); }
+  observeStream(request: WireRequest, scope = "Playground") {
+    const entry: NetworkEntry = { id: ++this.#sequence, scope, method: request.method, port: request.port, path: safePath(request.path),
+      started: performance.now(), duration: null, status: null, error: null, requestHeaders: headers(request.headers), responseHeaders: {},
+      requestBody: bodyPreview(request.body), responseBody: null };
+    const active = this.recording; let count = 0, prefix = new Uint8Array(0), finished = false;
+    if (active) { this.entries.push(entry); while (this.entries.length > this.capacity) { this.entries.shift(); this.dropped++; } this.emit(); }
+    return {
+      response: (response: Omit<WireResponse, "body">) => {
+        entry.status = response.status; entry.error = response.error ?? null; entry.responseHeaders = headers(response.headers);
+        if (active && this.entries.includes(entry)) this.emit();
+      },
+      chunk: (chunk: Uint8Array) => {
+        count += chunk.length;
+        if (active && prefix.length < BODY_LIMIT) { const next = new Uint8Array(Math.min(BODY_LIMIT, prefix.length + chunk.length)); next.set(prefix); next.set(chunk.subarray(0, next.length - prefix.length), prefix.length); prefix = next; }
+      },
+      finish: (error?: unknown) => {
+        if (finished) return; finished = true;
+        if (error !== undefined) entry.error = error instanceof Error ? error.message : String(error);
+        let binary = ""; for (const byte of prefix) binary += String.fromCharCode(byte);
+        const preview = bodyPreview(btoa(binary));
+        entry.responseBody = {...preview, bytes:count, truncated:preview.truncated || count > prefix.length};
+        entry.duration = Math.max(0, performance.now() - entry.started);
+        if (active && this.entries.includes(entry)) this.emit();
+      },
+    };
+  }
   async trace(request: WireRequest, invoke: () => Promise<WireResponse>, scope = "Playground"): Promise<WireResponse> {
     if (!this.recording) return invoke();
     const entry: NetworkEntry = {

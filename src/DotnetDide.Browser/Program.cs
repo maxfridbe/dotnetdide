@@ -37,6 +37,29 @@ public static partial class RuntimeBridge
     [JSExport] public static void SetSiteAccess(bool enabled) => Current.SetSiteAccess(enabled);
     [JSExport] public static string Sites() => JsonSerializer.Serialize(Current.WireSites, Json);
     [JSExport] public static async Task<string> Request(string request) => JsonSerializer.Serialize(await Current.RequestAsync(JsonSerializer.Deserialize<WireRequest>(request, Json) ?? throw new ArgumentException("Missing request.")), Json);
+    private static WireStream? _stream;
+    [JSExport]
+    public static async Task<string> BeginStream(string request, int maximumBytes)
+    {
+        if (_stream is not null) throw new InvalidOperationException("A site stream is already active.");
+        _stream = Current.RequestStream(JsonSerializer.Deserialize<WireRequest>(request, Json) ?? throw new ArgumentException("Missing request."), maximumBytes);
+        return JsonSerializer.Serialize(await _stream.Headers, Json);
+    }
+    private static byte[] _chunk = [];
+    [JSExport]
+    public static async Task<int> ReadStream()
+    { _chunk = await (_stream ?? throw new InvalidOperationException("No site stream.")).ReadAsync(); return _chunk.Length; }
+    [JSExport]
+    [return: JSMarshalAs<JSType.Array<JSType.Number>>]
+    public static byte[] TakeStreamChunk() { var chunk = _chunk; _chunk = []; return chunk; }
+    [JSExport] public static void CancelStream() => _stream?.Cancel();
+    [JSExport]
+    public static async Task<string> FinishStream()
+    {
+        var stream = _stream ?? throw new InvalidOperationException("No site stream.");
+        try { return JsonSerializer.Serialize(await stream.Completion, Json); }
+        finally { stream.Dispose(); _stream = null; }
+    }
     [JSExport] public static void SetNugetAccess(bool enabled) => Current.SetNugetAccess(enabled);
     [JSExport] public static void Reset() => Current.Reset();
 

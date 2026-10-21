@@ -128,6 +128,32 @@ using (var debug = JsonDocument.Parse(Dotnet.GetDebugInfo()))
 }
 ```
 
+## Stream a site response
+
+The browser host supports streaming virtual HTTP responses. Write and flush
+asynchronously in a Wire handler; respect cancellation:
+
+```csharp
+for (var i = 0; i < 100; i++)
+{
+    await context.Response.WriteAsync($"Progress {i}\n", context.RequestAborted);
+    await context.Response.Body.FlushAsync(context.RequestAborted);
+    await Task.Delay(100, context.RequestAborted);
+}
+```
+
+In page JavaScript, read `const reader = (await fetch('/progress')).body.getReader()`
+and decode chunks incrementally with `TextDecoder.decode(value, {stream:true})`.
+The SDK host can use `runtime.requestSiteStream(request)`; always consume its body
+or cancel it, and await `response.completed` before inspecting final diagnostics.
+Use async output: synchronous writes have only 64 KiB of staging space. Default
+limits are 16 MiB/request and 64 MiB/response; the trusted SDK host may configure
+`siteResponseLimitBytes` up to 512 MiB. Streaming uses <=64 KiB binary chunks,
+backpressure, and a 30-second idle deadline. It does not enlarge workspace quotas.
+Requests remain serialized; files checkpoint after completion in Lethetic.
+HTML/media preparation and legacy `requestSite` still buffer complete bodies;
+Python sites in Lethetic also remain buffered. See [Wire limits](docs/wire.md#streaming-and-transfer-limits).
+
 ## Default imports
 
 Interactive submissions (`runCSharpAsync`) automatically import exactly:

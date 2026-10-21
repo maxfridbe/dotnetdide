@@ -1,4 +1,4 @@
-# dotnetdide
+<h1><img src="docs/images/dotnetdide-logo.svg" width="520" alt=".NETdide — .NET WebAssembly runspace"></h1>
 
 **[Try it now — C# playground](https://maxfridbe.github.io/dotnetdide/)** ·
 Editable examples, downloadable files, real browser checks and virtual Network / Console / Assemblies DevTools.
@@ -28,6 +28,7 @@ browser JavaScript.
 - Reset variables while retaining files, or start a fresh worker for a full reset.
 - Build workspace C# files and supported SDK-style projects into downloadable DLL/PDB files.
 - Run compiled programs with arguments, async entry points, build logs and captured output.
+- Stream virtual HTTP responses in bounded binary chunks with backpressure and cancellation; 16 MiB requests and configurable responses (64 MiB default).
 - Host ASP.NET Core middleware/routes on virtual ports with `DotnetDide.Wire` and an isolated interactive iframe.
 - Inspect virtual HTTP requests and C#/iframe console output in reusable Snabbdom DevTools: filtering, stack traces and JSON export.
 - Load compatible managed NuGet packages with permission-gated JavaScript `runtime.LoadNuget(name, version)` or C# `DotnetDide.Nuget.Load(name, version)`.

@@ -1,11 +1,13 @@
 // Interactive HTML lives in an opaque iframe. Only virtual HTTP messages cross
 // into the host; no session storage, model keys, DOM handles or worker references.
-export async function createWirePreview({ iframe, request, port, path = '/', onNavigate = () => {}, onConsole = () => {} }) {
+export async function createWirePreview({ iframe, request, requestStream, port, path = '/', onNavigate = () => {}, onConsole = () => {} }) {
   if (!(iframe instanceof HTMLIFrameElement)) throw new TypeError('An iframe is required.');
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new TypeError('Invalid virtual port.');
   iframe.setAttribute('sandbox', 'allow-scripts allow-forms'); iframe.referrerPolicy = 'no-referrer';
   const hostUrl = new URL("./wire-preview-host.html", import.meta.url);
   let closed = false, generation = 0, channel = null, currentPath = path, detach = () => {};
+  const activeStreams = new Set();
+  const cancelStreams = () => { for (const response of activeStreams) response.cancel(new Error('Preview closed or navigated.')); activeStreams.clear(); };
   const origin = `http://wire.invalid:${port}`;
   const local = (value, base) => {
     const url = new URL(value, origin + base);
@@ -33,7 +35,7 @@ export async function createWirePreview({ iframe, request, port, path = '/', onN
   async function render(nextPath) {
     if (closed) throw new Error('Preview is closed.');
     const mine = ++generation; currentPath = local(nextPath, currentPath);
-    detach(); channel?.close(); channel = null;
+    cancelStreams(); detach(); channel?.close(); channel = null;
     const page = await get(currentPath);
     if (!contentType(page).includes('text/html')) throw new Error('Choose an HTML page for the interactive preview.');
     const template = document.createElement('template'); template.innerHTML = text(page.body);
@@ -79,13 +81,20 @@ export async function createWirePreview({ iframe, request, port, path = '/', onN
           return;
         }
         if (!Number.isSafeInteger(data?.id)) return;
-        const respond = message => { if (!closed && mine === generation) pair.port1.postMessage({id:data.id,...message}); };
+        const respond = (message, transfer = []) => { if (!closed && mine === generation) pair.port1.postMessage({id:data.id,...message}, transfer); };
         try {
           if (data.navigate) { await render(local(data.navigate, currentPath)); return; }
           const value = data.request;
-          if (!value || typeof value.path !== 'string' || typeof value.method !== 'string' || (value.body?.length ?? 0) > 2_800_000) throw new Error('Invalid preview request.');
-          const response = await request({ port, method:value.method, path:local(value.path,currentPath), headers:value.headers, body:value.body });
-          respond({response});
+          if (!value || typeof value.path !== 'string' || typeof value.method !== 'string' || (value.body?.length ?? 0) > Math.ceil(16 * 1024 * 1024 / 3) * 4) throw new Error('Invalid preview request.');
+          const input = { port, method:value.method, path:local(value.path,currentPath), headers:value.headers, body:value.body };
+          if (requestStream) {
+            const response = await requestStream(input);
+            if (closed || mine !== generation) { response.cancel(new Error('Preview closed.')); return; }
+            activeStreams.add(response);
+            void response.completed.finally(() => activeStreams.delete(response)).catch(() => {});
+            try { respond({response:{status:response.status,headers:response.headers,body:response.body}}, [response.body]); }
+            catch (error) { response.cancel(error); throw error; }
+          } else respond({response:await request(input)});
         } catch(error) { respond({error:String(error?.message ?? error)}); }
       };
       iframe.contentWindow.postMessage({type:'dotnetdide-wire-connect',token}, '*', [pair.port2]);
@@ -100,7 +109,7 @@ export async function createWirePreview({ iframe, request, port, path = '/', onN
     onNavigate(currentPath);
   }
   try { await render(path); } catch(error) { closed=true;detach();channel?.close();iframe.removeAttribute('src');iframe.removeAttribute('srcdoc');throw error; }
-  return { reload: () => render(currentPath), navigate: render, destroy() { closed=true;generation++;detach();channel?.close();iframe.removeAttribute('src');iframe.removeAttribute('srcdoc'); } };
+  return { reload: () => render(currentPath), navigate: render, destroy() { closed=true;generation++;cancelStreams();detach();channel?.close();iframe.removeAttribute('src');iframe.removeAttribute('srcdoc'); } };
 }
 
 function guest(token, base) {
@@ -169,18 +178,25 @@ function guest(token, base) {
   });
   const invoke = async message => {
     await connected;if(pending.size>=32)throw new Error('Too many preview requests.');
-    return new Promise((resolve,reject)=>{const id=++sequence;const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Preview request timed out.'));},25000);pending.set(id,{resolve,reject,timer});port.postMessage({id,...message});});
+    return new Promise((resolve,reject)=>{const id=++sequence;const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Preview request timed out.'));},35000);pending.set(id,{resolve,reject,timer});port.postMessage({id,...message});});
   };
   globalThis.fetch = async (input,init={}) => {
     const url=new URL(typeof input==='string'||input instanceof URL?input:input.url,base);
     if(url.origin!==new URL(base).origin)throw new TypeError('External networking is disabled in interactive previews.');
     const req=new Request(input instanceof Request?input:url,init);req.signal.throwIfAborted();
-    let body='';if(!['GET','HEAD'].includes(req.method)){const bytes=new Uint8Array(await req.arrayBuffer());for(let i=0;i<bytes.length;i+=8192)body+=String.fromCharCode(...bytes.subarray(i,i+8192));body=btoa(body);}
+    let body='';if(!['GET','HEAD'].includes(req.method)){const bytes=new Uint8Array(await req.arrayBuffer());if(bytes.length>16*1024*1024)throw new Error('Request body exceeds 16 MiB.');for(let i=0;i<bytes.length;i+=8192)body+=String.fromCharCode(...bytes.subarray(i,i+8192));body=btoa(body);}
     const response=await invoke({request:{path:url.pathname+url.search,method:req.method,headers:Object.fromEntries([...req.headers].map(([key,value])=>[key,[value]])),body}});
+    if(req.signal.aborted && response.body instanceof ReadableStream) await response.body.cancel(req.signal.reason);
     req.signal.throwIfAborted();
-    const bytes=Uint8Array.from(atob(response.body),c=>c.charCodeAt(0));
     const headers=new Headers();for(const [key,values] of Object.entries(response.headers))for(const value of values)headers.append(key,value);
-    return new Response([204,205,304].includes(response.status)||req.method==='HEAD'?null:bytes,{status:response.status,headers});
+    const noBody=[204,205,304].includes(response.status)||req.method==='HEAD';
+    if (response.body instanceof ReadableStream) {
+      const body=response.body.pipeThrough(new TransformStream(),{signal:req.signal});
+      if(noBody){const reader=body.getReader();try{while(!(await reader.read()).done){}}finally{reader.releaseLock()}}
+      return new Response(noBody?null:body,{status:response.status,headers});
+    }
+    const bytes=Uint8Array.from(atob(response.body),c=>c.charCodeAt(0));
+    return new Response(noBody?null:bytes,{status:response.status,headers});
   };
   addEventListener('click',event=>{
     const anchor=event.target?.closest?.('a[href]');if(!anchor || anchor.getAttribute('href').startsWith('#'))return;

@@ -14,6 +14,61 @@ public sealed class WireTests : IDisposable
         Assert.True(result.Success, string.Join("\n", result.Diagnostics.Select(d => d.Message)) + result.Error);
     }
     [Fact]
+    public async Task StreamReturnsHeadersBeforeCompletionAndTransfersLargeBodiesWithBackpressure()
+    {
+        using var runspace = Create();
+        await Run(runspace, """
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            var app = DotnetDide.Wire.CreateApplication();
+            app.Run(async context => {
+                context.Response.Headers["X-Stream"] = "yes";
+                for (var i = 0; i < 64; i++)
+                    await context.Response.Body.WriteAsync(new byte[65536], context.RequestAborted);
+                File.WriteAllText("finished.txt", "done");
+            });
+            await DotnetDide.Wire.ListenAsync(8080, app);
+            """);
+        using var stream = runspace.RequestStream(new(8080, "GET", "/"));
+        var headers = await stream.Headers.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("yes", headers.Headers["X-Stream"][0]);
+        Assert.False(stream.Completion.IsCompleted);
+        Assert.False(File.Exists(Path.Combine(_root, "finished.txt")));
+        long total = 0;
+        while (true) { var chunk = await stream.ReadAsync(); if (chunk.Length == 0) break; Assert.InRange(chunk.Length, 1, 65536); total += chunk.Length; }
+        Assert.Equal(4 * 1024 * 1024, total);
+        Assert.Null((await stream.Completion).Error);
+        Assert.True(File.Exists(Path.Combine(_root, "finished.txt")));
+    }
+
+    [Fact]
+    public async Task StreamCancellationAndTransferLimitReleaseTheRunspace()
+    {
+        using var runspace = Create();
+        await Run(runspace, """
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            var app = DotnetDide.Wire.CreateApplication();
+            app.Run(async context => {
+                while (true) await context.Response.Body.WriteAsync(new byte[65536], context.RequestAborted);
+            });
+            await DotnetDide.Wire.ListenAsync(8080, app);
+            """);
+        using (var stream = runspace.RequestStream(new(8080, "GET", "/")))
+        {
+            await stream.Headers; await stream.ReadAsync(); stream.Cancel();
+            Assert.NotNull((await stream.Completion.WaitAsync(TimeSpan.FromSeconds(5))).Error);
+        }
+        using (var stream = runspace.RequestStream(new(8080, "GET", "/"), 100000))
+        {
+            await stream.Headers;
+            await Assert.ThrowsAnyAsync<Exception>(async () => { while ((await stream.ReadAsync()).Length > 0) { } });
+            Assert.Contains("100000", (await stream.Completion).Error);
+        }
+        Assert.True((await runspace.RunAsync("6 * 7")).Success);
+    }
+
+    [Fact]
     public async Task SiteOutputAndHostDebugSnapshotAreAvailable()
     {
         using var runspace = new Runspace(new WorkspaceFileSystem(_root), References, siteAccess: true,
@@ -125,8 +180,8 @@ public sealed class WireTests : IDisposable
         Assert.Equal("yes", File.ReadAllText(Path.Combine(_root, "app", "completed.txt")));
         Assert.Equal(200, (await runspace.RequestAsync(new(9000, "POST", "/save"))).Status);
         Assert.True(File.Exists(Path.Combine(_root, "app", "request.txt")));
-        Assert.Equal(500, (await runspace.RequestAsync(new(9000, "GET", "/big"))).Status);
-        Assert.Equal(413, (await runspace.RequestAsync(new(9000, "POST", "/save", Body: new string('A', 3 * 1024 * 1024)))).Status);
+        Assert.Equal(200, (await runspace.RequestAsync(new(9000, "GET", "/big"))).Status);
+        Assert.Equal(413, (await runspace.RequestAsync(new(9000, "POST", "/save", Body: new string('A', 24 * 1024 * 1024)))).Status);
         using var cancel = new CancellationTokenSource(100);
         Assert.Equal(504, (await runspace.RequestAsync(new(9000, "GET", "/slow"), cancel.Token)).Status);
         await Run(runspace, "DotnetDide.Wire.Stop(9000);"); Assert.Empty(runspace.WireSites);

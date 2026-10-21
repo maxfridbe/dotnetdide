@@ -158,6 +158,24 @@ async function openSite(): Promise<void> {
       iframe: document.querySelector<HTMLIFrameElement>("#site-frame")!, port: Number(sitePort), path: sitePath,
       onConsole: entry => { if (runtime === active && previewGeneration === generation) active.recordConsole(entry); },
       onNavigate: path => { if (previewGeneration === generation) { sitePath = path; changed(); } },
+      requestStream: request => {
+        const next = siteQueue.catch(() => {}).then(async () => {
+          if (runtime !== active || generation !== previewGeneration) throw new Error("Preview stopped.");
+          if (job) throw new Error("Wait for the current C# submission.");
+          wireBusy++; changed();
+          try {
+            const response = await active.requestSiteStream(request);
+            const done = response.completed.finally(async () => {
+              try { if (runtime === active) await refreshFiles(active); }
+              finally { wireBusy--; changed(); }
+            });
+            done.catch(() => {});
+            return {...response, completed:done};
+          } catch (error) { wireBusy--; changed(); throw error; }
+        });
+        siteQueue = next.then(response => response.completed); siteQueue.catch(() => {});
+        return next;
+      },
       request: request => {
         const next = siteQueue.catch(() => {}).then(async () => {
           if (runtime !== active || generation !== previewGeneration) throw new Error("Preview stopped.");
@@ -198,7 +216,7 @@ function button(id: string, text: string, disabled: boolean, click: () => void):
 function view(): VNode {
   return h("div#app.app", {class: {"debugger-right": network.open && network.layoutDock === "right"}}, [
     h("header.app-header", [
-      h("a.brand", {attrs: {href: "./"}}, ["dotnet", h("span", "dide")]),
+      h("a.brand", {attrs: {href: "./", "aria-label": "DotnetDide playground"}}, [h("img", {attrs: {src: "docs/images/dotnetdide-logo.svg", alt: ".NETdide", width: "152", height: "42"}})]),
       h("span.app-subtitle", "C# playground"), h("span.badge", ".NET 11 · WASM"),
       h("nav", {attrs: {"aria-label": "Playground tools"}}, [
         h("button#network-toggle", {attrs: {type: "button", "aria-pressed": String(network.open), "aria-controls": "virtual-debugger", title: "Toggle virtual debugger (Alt+N)"},

@@ -3,12 +3,14 @@ export { clearNugetCache } from './package-cache.js';
 export { DebugInfoStore } from './playground/debug-info.js';
 import { DebugInfoStore } from './playground/debug-info.js';
 import { validateRelay } from './relay-fetch.js';
+import {openSiteStream, collectSiteStream} from './site-stream.js';
 
 /** Load one isolated .NET 11 runspace. All compilation and file operations run in .NET. */
-export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networkAccess = false, nugetAccess = false, siteAccess = false, relay = null, diagnostics = new DebugInfoStore(), debugScope = "Runspace" } = {}) {
+export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networkAccess = false, nugetAccess = false, siteAccess = false, relay = null, diagnostics = new DebugInfoStore(), debugScope = "Runspace", siteResponseLimitBytes = 64 * 1024 * 1024 } = {}) {
   if (typeof networkAccess !== 'boolean') throw new TypeError('networkAccess must be a boolean.');
   if (typeof nugetAccess !== 'boolean') throw new TypeError('nugetAccess must be a boolean.');
   if (typeof siteAccess !== 'boolean') throw new TypeError('siteAccess must be a boolean.');
+  if (!Number.isSafeInteger(siteResponseLimitBytes) || siteResponseLimitBytes < 1 || siteResponseLimitBytes > 512 * 1024 * 1024) throw new TypeError('siteResponseLimitBytes must be 1–512 MiB in bytes.');
   relay = validateRelay(relay);
   if (!(diagnostics instanceof DebugInfoStore)) throw new TypeError('diagnostics must be a DebugInfoStore.');
   const recordConsole = value => diagnostics.recordConsole(value);
@@ -90,11 +92,12 @@ export async function loadDotnetdide({ signal, startupTimeoutMs = 120000, networ
     },
     listSites: () => request('sites'),
     listAssemblies: () => request('assemblies'),
-    requestSite: (value, options = {}) => diagnostics.network.trace(value, async () => {
-      const result = await request('site-request', value, { timeoutMs: 20000, ...options });
-      output(result, `${debugScope} · site :${value.port}`);
-      return result;
-    }, debugScope),
+    requestSiteStream(value, options = {}) {
+      if (closed) return Promise.reject(new Error('Runspace is terminated.'));
+      return openSiteStream(worker, ++sequence, value, siteResponseLimitBytes, options, pending,
+        diagnostics.network.observeStream(value, debugScope), result => output(result, `${debugScope} · site :${value.port}`), terminate);
+    },
+    async requestSite(value, options = {}) { return collectSiteStream(await runspace.requestSiteStream(value, options)); },
     getDebugInfo: () => diagnostics.snapshot(),
     GetDebugInfo: () => diagnostics.snapshot(),
     clearDebugInfo: () => diagnostics.clear(),

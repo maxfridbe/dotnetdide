@@ -27,7 +27,7 @@ NAudio 3 sample providers use `Read(Span<float>)`. The examples use `using (...)
 blocks so they work as either interactive scripts or regular compiled programs.
 Save them as `.cs`, then `await Dotnet.Run("images.cs")` or `await Dotnet.Run("audio.cs")`.
 All output streams must be disposed before exporting/syncing files. Lethetic's
-session limits still apply (1 MiB per file, 2 MiB total); keep images and clips small.
+session limits still apply (16 MiB per file, 64 MiB total, 100 files); keep images and clips small.
 
 ## PNG and JPEG example
 

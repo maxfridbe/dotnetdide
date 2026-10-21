@@ -33,13 +33,42 @@ async function dispatch({ operation, payload }) {
   if (operation === 'files') return JSON.parse(bridge.Files(JSON.stringify(payload)));
   throw new Error('Unknown runspace operation.');
 }
+async function streamRequest(data) {
+  const port = data.port; let cancelled = false, wake, credit = false;
+  port.onmessage = ({data}) => {
+    if (data.type === 'cancel') { cancelled = true; bridge?.CancelStream(); wake?.(); }
+    else if (data.type === 'pull') { credit = true; wake?.(); }
+  };
+  try {
+    if (!bridge) throw new Error('Runtime is not initialized.');
+    const headers = JSON.parse(await bridge.BeginStream(JSON.stringify(data.payload.request), data.payload.maximumBytes));
+    port.postMessage({type:'headers',value:headers});
+    while (!cancelled) {
+      if (!credit) await new Promise(resolve => { wake = resolve; });
+      wake = null; if (cancelled) break; credit = false;
+      const length = await bridge.ReadStream();
+      if (!length) {
+        const result = JSON.parse(await bridge.FinishStream());
+        port.postMessage({type:'end',value:result});
+        return;
+      }
+      const bytes = bridge.TakeStreamChunk();
+      port.postMessage({type:'chunk',bytes}, [bytes.buffer]);
+    }
+  } catch (error) { port.postMessage({type:'error',error:String(error?.message ?? error)}); }
+  finally {
+    bridge?.CancelStream();
+    try { await bridge?.FinishStream(); } catch { /* Already finished or cancelled. */ }
+    port.postMessage({type:'closed'}); port.close();
+  }
+}
 self.onmessage = ({ data }) => {
-  // Files and submissions share a single ordered queue, including during async C# calls.
+  // Reads/cancellation use the dedicated port; other operations wait for EOF.
   queue = queue.then(async () => {
     try {
-      const value = await dispatch(data);
-      const assemblies = bridge && ['initialize','run','reset','site-request','assemblies'].includes(data.operation) ? JSON.parse(bridge.Assemblies()) : undefined;
-      self.postMessage({ id: data.id, value, assemblies });
+      const value = data.operation === 'site-stream' ? await streamRequest(data) : await dispatch(data);
+      const assemblies = bridge && ['initialize','run','reset','site-request','site-stream','assemblies'].includes(data.operation) ? JSON.parse(bridge.Assemblies()) : undefined;
+      self.postMessage(data.operation === 'site-stream' ? {assemblies} : {id:data.id,value,assemblies});
     }
     catch (error) { self.postMessage({ id: data.id, error: String(error?.message ?? error) }); }
   });

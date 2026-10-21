@@ -9,6 +9,7 @@ export interface SubmissionResult {
 export interface Workspace { version: number; directories: string[]; files: {path: string; data: string}[] }
 export interface WireRequest { port: number; method: string; path: string; headers?: Record<string, string[]>; body?: string | null }
 export interface WireResponse { status: number; headers: Record<string, string[]>; body: string; error?: string | null; stdout?: string; stderr?: string }
+export interface WireStreamResponse { status: number; headers: Record<string,string[]>; body: ReadableStream<Uint8Array>; error?: string | null; completed: Promise<void>; cancel(reason?: unknown): void }
 export interface WireSite { port: number; webRoot: string | null }
 export interface RequestOptions { signal?: AbortSignal; timeoutMs?: number }
 export interface Runspace {
@@ -25,6 +26,7 @@ export interface Runspace {
   setSiteAccess(enabled: boolean): Promise<void>;
   listAssemblies(): Promise<LoadedAssembly[]>;
   listSites(): Promise<WireSite[]>;
+  requestSiteStream(value: WireRequest, options?: RequestOptions): Promise<WireStreamResponse>;
   requestSite(value: WireRequest, options?: RequestOptions): Promise<WireResponse>;
   reset(): Promise<void>; terminate(): void;
   exportWorkspace(): Promise<Workspace>; importWorkspace(value: Workspace): Promise<void>;
@@ -39,6 +41,7 @@ export interface Runspace {
 }
 export function loadDotnetdide(options?: {
   signal?: AbortSignal; startupTimeoutMs?: number; networkAccess?: boolean;
+  siteResponseLimitBytes?: number;
   diagnostics?: DebugInfoStore; debugScope?: string;
   nugetAccess?: boolean; siteAccess?: boolean; relay?: {endpoint: string; token?: string} | null;
 }): Promise<Runspace>;
@@ -46,6 +49,7 @@ export interface WirePreview { reload(): Promise<void>; navigate(path: string): 
 export function createWirePreview(options: {
   iframe: HTMLIFrameElement; port: number; path?: string;
   onConsole?: (entry: ConsoleMessage) => void;
+  requestStream?: (value: WireRequest) => Promise<WireStreamResponse>;
   onNavigate?: (path: string) => void; request: (value: WireRequest) => Promise<WireResponse>;
 }): Promise<WirePreview>;
 export function clearNugetCache(): Promise<void>;

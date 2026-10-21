@@ -239,10 +239,16 @@ packages and permission behavior. Serve the bundled guides alongside the SDK.
 Pass `siteAccess: true` to `loadDotnetdide` to enable virtual servers. The default
 is false. `setSiteAccess(false)` stops them, `listSites()` lists ports, and
 `requestSite({port, method, path, headers, body}, {signal, timeoutMs})` dispatches
-buffered HTTP to C# (body is base64). Calls share the runtime queue.
+buffered HTTP to C# (body is base64). `requestSiteStream` returns headers and a
+binary `ReadableStream` without collecting the response. Consume or cancel it and
+await `response.completed` before exporting files. Requests allow 16 MiB; responses
+default to 64 MiB, configurable up to 512 MiB with `siteResponseLimitBytes`.
+Chunks are <=64 KiB with backpressure and a 30-second idle deadline. Calls share
+the runtime queue until completion. See [streaming limits](docs/wire.md#streaming-and-transfer-limits).
 
-Use `createWirePreview({iframe, port, path, request})` for interactive HTML. Keep
-`wire-preview.js` and `wire-preview-host.html` beside the runtime. The helper
+Use `createWirePreview({iframe, port, path, request, requestStream})` for interactive HTML.
+Pass `requestStream: value => runtime.requestSiteStream(value)` to stream iframe fetch responses. Keep
+`site-stream.js`, `wire-preview.js` and `wire-preview-host.html` beside the runtime. The helper
 uses an opaque sandbox with script/form events; the parent must restrict iframe
 navigation with `frame-src 'self'`. Its separate document CSP allows generated
 code without relaxing the parent script policy. Export session files after mutating
@@ -253,9 +259,9 @@ request limits and supported browser features.
 
 The playground ships a reusable **TypeScript/Snabbdom** component at
 `playground/network-debugger.js`, with type declarations and
-`network-debugger.css`. Wrap `runtime.requestSite` with `monitor.trace` to observe
-real Wire traffic without changing responses or replaying requests. Pass the
-wrapped method to `createWirePreview` to include iframe requests. The host owns
+`network-debugger.css`. Supply `diagnostics: monitor.diagnostics` to the runtime;
+`requestSite` and `requestSiteStream` record real traffic automatically. Do not
+wrap them in another trace or the log will duplicate requests. The host owns
 the patch loop, layout and runtime permissions. See [component setup and log
 limits](docs/playground.md#reuse-the-snabbdom-component). No Node.js is needed
 when embedding the published modules.

@@ -113,8 +113,9 @@ Files and chat remain in the session. The standalone SDK instead allows
 Preserve the original exception details when diagnosing a failure. A generic
 fetch error does not distinguish CORS, connectivity, or remote service failures;
 do not replace every such error with a claim about an ad blocker. Use
-`context.RequestAborted` for outbound calls; the entire route has a 15-second
-cooperative deadline, including multiple sequential API calls.
+`context.RequestAborted` for outbound calls. Streamed browser requests have a
+30-second idle deadline; ongoing progress resets it. Native buffered `RequestAsync`
+retains its 15-second cooperative total deadline.
 
 ## JavaScript embedding
 
@@ -159,12 +160,62 @@ const response = await runtime.requestSite({
 // { status, headers: { name: [values] }, body: 'base64...', error: null }
 ```
 
-`requestSite` queues with C# submissions and file operations. Its default deadline
-is 20 seconds; abort/timeout terminates the worker. ASP.NET handlers get a 15-second
-cooperative `RequestAborted` token. A handler that ignores cancellation is stopped
-by the worker deadline, not by native runspace cancellation. Eight servers are
-allowed; each request/response body is bounded to 2 MiB, request headers to 64
-entries/16 KiB, and paths to 8 KiB. No streaming, SSE, sockets or WebSockets.
+## Streaming and transfer limits
+
+`requestSiteStream` returns headers immediately and a `ReadableStream<Uint8Array>`.
+The worker uses a single-slot queue and at most 64 KiB per binary chunk. Reader
+backpressure reaches C# writes; response bytes are not base64-encoded on this path.
+The debugger retains only a 16 KiB body preview plus a byte count.
+
+```js
+const runtime = await loadDotnetdide({siteAccess: true,
+  siteResponseLimitBytes: 128 * 1024 * 1024}); // Default 64 MiB; maximum 512 MiB.
+const response = await runtime.requestSiteStream({port: 8080, method: "GET", path: "/data"});
+const reader = response.body.getReader();
+try {
+  while (true) {
+    const {value, done} = await reader.read();
+    if (done) break;
+    console.log("Received bytes:", value.byteLength);
+  }
+  await response.completed;
+} finally { reader.releaseLock(); }
+// For early exit: await reader.cancel() while it is locked, or response.cancel().
+```
+
+Use `await context.Response.Body.WriteAsync(bytes, context.RequestAborted)` and
+`await context.Response.Body.FlushAsync(context.RequestAborted)` in handlers.
+`CopyToAsync` and `BodyWriter.FlushAsync` work too. Synchronous writes have a
+64 KiB staging buffer and must be flushed asynchronously; use async writes for
+large output. Headers become immutable once started. A later error faults the
+body stream, since an already-sent HTTP status cannot be replaced.
+
+Requests remain buffered and are limited to **16 MiB**. Responses default to
+**64 MiB total**, configurable by the trusted host up to **512 MiB** using
+`siteResponseLimitBytes`. These are transfer limits, independent of workspace
+file limits. `requestSite` remains a compatibility API: it consumes the stream
+and returns the complete base64 body, so use `requestSiteStream` to avoid whole-body
+allocation. Native `Runspace.RequestStream` offers the same bounded chunk queue;
+`RequestAsync` remains buffered with a 64 MiB response ceiling.
+
+Browser requests have a **30-second idle timeout**, not a fixed total-transfer
+deadline. A shorter `timeoutMs` can be supplied in request options. Slow readers
+that stop consuming eventually time out. Cancellation reaches `RequestAborted`;
+a handler which ignores it causes the host to terminate the worker after a
+one-second grace period. Otherwise the worker remains reusable. Requests, file
+operations and submissions remain serialized until the response completes.
+Always consume or cancel a response; stopping the worker also cancels streams.
+Eight servers are allowed; request headers remain limited to 64 entries/16 KiB,
+and paths to 8 KiB. Native sockets and WebSockets are unsupported.
+
+Pass `requestStream: (value) => runtime.requestSiteStream(value)` alongside
+`request: (value) => runtime.requestSite(value)` to `createWirePreview` to enable
+streaming iframe `fetch()`. The playground and Lethetic do this automatically.
+Page JavaScript can read `response.body.getReader()`; `text()`/`arrayBuffer()` still
+buffer the full response. HTML, CSS, scripts and initial media resources are
+still collected and rewritten before display. This is not native video/range
+streaming, a service-worker server, or an EventSource implementation. The iframe
+keeps its opaque sandbox; streaming does not grant network or parent-page access.
 
 ## Preview scope and session lifecycle
 

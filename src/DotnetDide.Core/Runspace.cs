@@ -100,7 +100,19 @@ public sealed class Runspace : IDisposable
         if (!enabled) _wire.Dispose();
         _wire.Enabled = enabled;
     }
-    public async Task<WireResponse> RequestAsync(WireRequest request, CancellationToken cancellationToken = default)
+    public WireStream RequestStream(WireRequest request, long maximumResponseBytes = WireServer.MaximumBodyBytes, CancellationToken cancellationToken = default)
+    {
+        var stream = new WireStream(maximumResponseBytes, cancellationToken);
+        _ = ProcessStream();
+        return stream;
+        async Task ProcessStream()
+        {
+            try { stream.Finish(await RequestCoreAsync(request, stream.Token, stream)); }
+            catch (Exception error) { stream.Fail(error); }
+        }
+    }
+    public Task<WireResponse> RequestAsync(WireRequest request, CancellationToken cancellationToken = default) => RequestCoreAsync(request, cancellationToken, null);
+    private async Task<WireResponse> RequestCoreAsync(WireRequest request, CancellationToken cancellationToken, WireStream? stream)
     {
         ObjectDisposedException.ThrowIf(_disposed, this); Interlocked.Increment(ref _pending);
         var entered = false;
@@ -113,7 +125,7 @@ public sealed class Runspace : IDisposable
             {
                 Directory.SetCurrentDirectory(Files.RootPath); Console.SetOut(output); Console.SetError(errors);
                 Wire.Current.Value = _wire; Nuget.Current.Value = _packages;
-                var response = await _wire.RequestAsync(request, cancellationToken);
+                var response = await _wire.RequestAsync(request, cancellationToken, stream);
                 return response with { Stdout = output.ToString(), Stderr = errors.ToString() };
             }
             finally { Directory.SetCurrentDirectory(previous); Console.SetOut(stdout); Console.SetError(stderr); Wire.Current.Value = null; Nuget.Current.Value = null; }

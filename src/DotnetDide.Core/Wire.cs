@@ -74,11 +74,11 @@ internal sealed class WireRegistry(WorkspaceFileSystem files) : IDisposable
         _servers.Add(port, server); return server;
     }
     internal bool Stop(int port) { CheckPermission(); if (!_servers.TryGetValue(port, out var server)) return false; server.Dispose(); return true; }
-    internal Task<WireResponse> RequestAsync(WireRequest request, CancellationToken cancellationToken)
+    internal Task<WireResponse> RequestAsync(WireRequest request, CancellationToken cancellationToken, WireStream? stream = null)
     {
         if (!Enabled) return Task.FromResult(WireServer.Error(403, "Interactive site access is disabled."));
         return _servers.TryGetValue(request.Port, out var server)
-            ? server.RequestAsync(request, cancellationToken) : Task.FromResult(WireServer.Error(503, "Virtual site is not running."));
+            ? server.RequestAsync(request, cancellationToken, stream) : Task.FromResult(WireServer.Error(503, "Virtual site is not running."));
     }
     public void Dispose()
     {
@@ -87,10 +87,11 @@ internal sealed class WireRegistry(WorkspaceFileSystem files) : IDisposable
     }
 }
 
-/// <summary>A real ASP.NET Core IServer using bounded, buffered requests over a virtual port.</summary>
+/// <summary>A real ASP.NET Core IServer using bounded requests and streamed or buffered responses over a virtual port.</summary>
 public sealed class WireServer : IServer
 {
-    public const int MaximumBodyBytes = 2 * 1024 * 1024;
+    public const int MaximumBodyBytes = 64 * 1024 * 1024;
+    public const int MaximumRequestBodyBytes = 16 * 1024 * 1024;
     private readonly WorkspaceFileSystem _files;
     private readonly Action _remove;
     private readonly string _directory;
@@ -121,7 +122,7 @@ public sealed class WireServer : IServer
     public Task StopAsync(CancellationToken cancellationToken) { Dispose(); return Task.CompletedTask; }
     public void Dispose() { if (_disposed) return; _disposed = true; _process = null; _remove(); }
     internal static WireResponse Error(int status, string error) => new(status, new(StringComparer.OrdinalIgnoreCase), "", error);
-    internal async Task<WireResponse> RequestAsync(WireRequest request, CancellationToken cancellationToken)
+    internal async Task<WireResponse> RequestAsync(WireRequest request, CancellationToken cancellationToken, WireStream? stream = null)
     {
         if (_process is null) return Error(503, "Virtual site is not running.");
         if (request.Path is null || request.Path.Length > 8192 || !request.Path.StartsWith('/') || request.Path.StartsWith("//") || request.Path.Contains('#')) return Error(400, "Invalid request path.");
@@ -129,9 +130,9 @@ public sealed class WireServer : IServer
         var parts = request.Path.Split('?', 2); string path;
         try { path = Uri.UnescapeDataString(parts[0]); } catch (UriFormatException) { return Error(400, "Invalid path encoding."); }
         if (path.Contains('\\') || path.Any(char.IsControl) || path.Split('/').Any(s => s is "." or "..")) return Error(400, "Unsafe request path.");
-        if ((request.Body?.Length ?? 0) > MaximumBodyBytes * 4 / 3 + 4) return Error(413, "Request body exceeds 2 MiB.");
+        if ((request.Body?.Length ?? 0) > (MaximumRequestBodyBytes + 2) / 3 * 4) return Error(413, "Request body exceeds 16 MiB.");
         byte[] body; try { body = Convert.FromBase64String(request.Body ?? ""); } catch (FormatException) { return Error(400, "Invalid request body."); }
-        if (body.Length > MaximumBodyBytes) return Error(413, "Request body exceeds 2 MiB.");
+        if (body.Length > MaximumRequestBodyBytes) return Error(413, "Request body exceeds 16 MiB.");
         var headers = new HeaderDictionary();
         if ((request.Headers?.Count ?? 0) > 64) return Error(431, "Too many headers.");
         var headerBytes = 0;
@@ -147,9 +148,9 @@ public sealed class WireServer : IServer
         headers["Host"] = $"localhost:{Port}"; headers.ContentLength = body.Length;
         using var input = new MemoryStream(body, false);
         var feature = new HttpRequestFeature { Protocol = "HTTP/1.1", Scheme = "http", Method = request.Method, Path = path, PathBase = "", QueryString = parts.Length > 1 ? "?" + parts[1] : "", RawTarget = request.Path, Headers = headers, Body = input };
-        using var response = new WireResponseFeature();
+        using var response = new WireResponseFeature(stream, request.Method == "HEAD");
         var features = new FeatureCollection(); features.Set<IHttpRequestFeature>(feature); features.Set<IHttpResponseFeature>(response); features.Set<IHttpResponseBodyFeature>(response);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken); timeout.CancelAfter(TimeSpan.FromSeconds(15));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken); if (stream is null) timeout.CancelAfter(TimeSpan.FromSeconds(15));
         features.Set<IHttpRequestLifetimeFeature>(new RequestLifetime(timeout.Token));
         var previousDirectory = Directory.GetCurrentDirectory();
         try
@@ -163,7 +164,7 @@ public sealed class WireServer : IServer
             });
             var resultHeaders = response.Headers.ToDictionary(p => p.Key, p => p.Value.Select(v => v ?? "").ToArray(), StringComparer.OrdinalIgnoreCase);
             resultHeaders.Remove("Set-Cookie");
-            return new(response.StatusCode, resultHeaders, request.Method == "HEAD" ? "" : Convert.ToBase64String(response.Bytes));
+            return new(response.StatusCode, resultHeaders, stream is not null || request.Method == "HEAD" ? "" : Convert.ToBase64String(response.Bytes));
         }
         catch (OperationCanceledException) { return Error(504, "Site request cancelled or timed out."); }
         catch (Exception error) { return Error(500, error.ToString()); }
@@ -178,8 +179,8 @@ public sealed class WireServer : IServer
         try
         {
             var stat = _files.Stat(full); if (stat.IsDirectory) return;
-            if (stat.Size > MaximumBodyBytes) { response.StatusCode = 413; return; }
-            var bytes = _files.ReadFile(full); response.StatusCode = 200;
+            if (stat.Size > response.MaximumBytes) { response.StatusCode = 413; return; }
+            response.StatusCode = 200;
             response.Headers.ContentType = Path.GetExtension(relative).ToLowerInvariant() switch
             {
                 ".html" or ".htm" => "text/html; charset=utf-8",
@@ -196,7 +197,12 @@ public sealed class WireServer : IServer
                 ".webm" => "video/webm",
                 _ => "application/octet-stream"
             };
-            response.Headers.ContentLength = bytes.Length; await response.Stream.WriteAsync(bytes, cancellationToken);
+            response.Headers.ContentLength = stat.Size;
+            if (!response.SuppressBody)
+            {
+                await using var file = new FileStream(full, FileMode.Open, FileAccess.Read, FileShare.Read, WireStream.ChunkBytes, useAsync: true);
+                await file.CopyToAsync(response.Stream, WireStream.ChunkBytes, cancellationToken);
+            }
         }
         catch (FileNotFoundException) { }
         catch (DirectoryNotFoundException) { }
