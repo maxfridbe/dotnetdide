@@ -216,7 +216,7 @@ function button(id: string, text: string, disabled: boolean, click: () => void):
 function view(): VNode {
   return h("div#app.app", {class: {"debugger-right": network.open && network.layoutDock === "right"}}, [
     h("header.app-header", [
-      h("a.brand", {attrs: {href: "./", "aria-label": "DotnetDide playground"}}, [h("img", {attrs: {src: "docs/images/dotnetdide-logo.svg", alt: ".NETdide", width: "152", height: "42"}})]),
+      h("a.brand", {attrs: {href: "./", "aria-label": "DotnetDide playground"}}, [h("img", {attrs: {src: "docs/images/dotnetdide-logo-dark.svg", alt: ".NETdide", width: "152", height: "42"}})]),
       h("span.app-subtitle", "C# playground"), h("span.badge", ".NET 11 · WASM"),
       h("nav", {attrs: {"aria-label": "Playground tools"}}, [
         h("button#network-toggle", {attrs: {type: "button", "aria-pressed": String(network.open), "aria-controls": "virtual-debugger", title: "Toggle virtual debugger (Alt+N)"},

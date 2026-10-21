@@ -1,4 +1,7 @@
-<h1><img src="docs/images/dotnetdide-logo.svg" width="520" alt=".NETdide — .NET WebAssembly runspace"></h1>
+<h1><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dotnetdide-logo-dark.svg">
+  <img src="docs/images/dotnetdide-logo.svg" width="520" alt=".NETdide — .NET WebAssembly runspace">
+</picture></h1>
 
 **[Try it now — C# playground](https://maxfridbe.github.io/dotnetdide/)** ·
 Editable examples, downloadable files, real browser checks and virtual Network / Console / Assemblies DevTools.

@@ -1,6 +1,5 @@
-<svg viewBox="0 0 760 210" width="760" height="210" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+<svg viewBox="11 26 629 180" width="629" height="180" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
   <title id="title">.NETdide — .NET WebAssembly runspace</title>
-  <rect width="760" height="210" rx="16" fill="#FFFFFF"/>
   <circle cx="36" cy="112" r="13" fill="#512BD4"/>
   <path d="M72 48 H90 L128 116 V48 H146 V136 H128 L90 68 V136 H72 V48 Z" fill="#512BD4"/>
   <path d="M166 48 H212 V64 H184 V84 H208 V100 H184 V120 H212 V136 H166 V48 Z" fill="#512BD4"/>
