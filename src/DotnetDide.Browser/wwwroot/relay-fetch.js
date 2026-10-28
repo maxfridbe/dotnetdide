@@ -33,6 +33,46 @@ async function readLimited(response) {
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
   return JSON.parse(new TextDecoder().decode(bytes));
 }
+// Relay failures are separate from target HTTP status codes in successful envelopes.
+// Never read an unbounded error page or expose request credentials in diagnostics.
+async function relayFailure(response, relay, request) {
+  const fallback = `HTTP relay failed (${response.status}). Check token, origin/target allowlists and upstream proxy. No direct fallback was attempted.`;
+  const type = response.headers.get('content-type') || '';
+  if (!/^(text\/plain|application\/(?:problem\+)?json)(?:;|$)/i.test(type)) {
+    await response.body?.cancel().catch(() => {}); return new Error(fallback);
+  }
+  const reader = response.body?.getReader();
+  if (!reader) return new Error(fallback);
+  const chunks = []; let length = 0, truncated = false;
+  const cancel = () => { void reader.cancel().catch(() => {}); };
+  const timer = setTimeout(cancel, 5000);
+  request.signal.addEventListener('abort', cancel, {once: true});
+  try {
+    while (length < 4096) {
+      const {value, done} = await reader.read(); if (done) break;
+      const part = value.subarray(0, 4096 - length); chunks.push(part); length += part.length;
+      if (length === 4096) { truncated = true; break; }
+    }
+  } catch { return new Error(fallback); }
+  finally { clearTimeout(timer); request.signal.removeEventListener('abort', cancel); cancel(); reader.releaseLock(); }
+  request.signal.throwIfAborted();
+  const bytes = new Uint8Array(length); let offset = 0;
+  for (const part of chunks) { bytes.set(part, offset); offset += part.length; }
+  let detail = new TextDecoder().decode(bytes);
+  if (/json/i.test(type)) {
+    try { const data = JSON.parse(detail); detail = typeof data.error === 'string' ? data.error : typeof data.message === 'string' ? data.message : ''; }
+    catch { detail = ''; }
+  }
+  const url = new URL(request.url);
+  const secrets = [relay.token, request.url, ...request.headers.values(), ...url.searchParams.values()];
+  for (const secret of secrets.filter(Boolean).sort((a,b) => b.length - a.length)) detail = detail.split(secret).join('[REDACTED]');
+  detail = detail.replace(/https?:\/\/[^\s<>"']+/gi, '[URL]')
+    .replace(/(?:Bearer|Basic)\s+[^\s,;]+/gi, '[REDACTED]')
+    .replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ').trim().slice(0, 1024);
+  // HTML is not a useful relay diagnostic, even if incorrectly labelled plain text.
+  if (!detail || /<[^>]+>/.test(detail)) return new Error(fallback);
+  return new Error(`HTTP relay failed (${response.status}): ${detail}${truncated ? ' [truncated]' : ''}. No direct fallback was attempted.`);
+}
 export async function relayFetch(fetch, relay, input, init) {
   if (!relay.token) throw new Error('Relay token is missing. Set it in Runtime & security; no direct fallback is permitted.');
   const request = new Request(input, init);
@@ -53,7 +93,7 @@ export async function relayFetch(fetch, relay, input, init) {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${relay.token}` },
     body: JSON.stringify({ url: url.href, method: request.method, headers: Object.fromEntries(request.headers), bodyBase64: bytes ? encode(bytes) : null }),
   });
-  if (!response.ok) { await response.body?.cancel(); throw new Error(`HTTP relay failed (${response.status}). Check token, origin/target allowlists and upstream proxy. No direct fallback was attempted.`); }
+  if (!response.ok) throw await relayFailure(response, relay, request);
   const envelope = await readLimited(response);
   request.signal.throwIfAborted();
   if (!Number.isInteger(envelope.status) || envelope.status < 200 || envelope.status > 599 || typeof envelope.bodyBase64 !== 'string' || envelope.bodyBase64.length > Math.ceil(MAX_BYTES / 3) * 4 || !envelope.headers || typeof envelope.headers !== 'object') throw new Error('Invalid relay response.');

@@ -194,3 +194,7 @@ No live Tor connectivity or anonymity guarantee is implied by the SOCKS test.
 - [.NET browser HTTP handler implementation](https://github.com/dotnet/runtime/blob/main/src/libraries/System.Net.Http/src/System/Net/Http/BrowserHttpHandler/BrowserHttpHandler.cs)
 - [.NET native SOCKS proxy support](https://devblogs.microsoft.com/dotnet/dotnet-6-networking-improvements/)
 - [Fetch methods, credentials and response visibility](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
+
+### Diagnosing outbound HTTP failures
+
+A target HTTP 403 means the destination rejected the request; it does not prove rate limiting or that Network access is off. A relay HTTP 502 means the relay could not complete forwarding. Preserve the bounded, sanitized relay explanation (DNS/connect/TLS/timeout/policy) instead of guessing about ad blockers or CORS. Tor exit addresses may be rejected, but do not claim that without evidence and never bypass Tor with direct HTTP. Relay requests omit browser cookies and do not execute website JavaScript; a challenge page requires a different authorized source/API. Save successful search results to session files before issuing more searches; repeated requests may be rejected.

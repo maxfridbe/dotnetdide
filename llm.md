@@ -513,3 +513,7 @@ use the browser and existing bounded Cache Storage, not localStorage. General
 network access is independent. `LoadNuget` rejects when permission is disabled or
 a package is incompatible; it does not silently grant permission. Already bundled
 image/audio defaults remain available without downloading them.
+
+### Diagnosing outbound HTTP failures
+
+A target HTTP 403 means the destination rejected the request; it does not prove rate limiting or that Network access is off. A relay HTTP 502 means the relay could not complete forwarding. Preserve the bounded, sanitized relay explanation (DNS/connect/TLS/timeout/policy) instead of guessing about ad blockers or CORS. Tor exit addresses may be rejected, but do not claim that without evidence and never bypass Tor with direct HTTP. Relay requests omit browser cookies and do not execute website JavaScript; a challenge page requires a different authorized source/API. Save successful search results to session files before issuing more searches; repeated requests may be rejected.

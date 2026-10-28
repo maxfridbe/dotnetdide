@@ -50,6 +50,37 @@ public sealed class RelayTests
         return await http.SendAsync(request);
     }
     [Fact]
+    public async Task RelayErrorsRetainBoundedDetailsWithoutSecretsOrDirectFallback()
+    {
+        await using var browser = new BrowserHarness(); await browser.StartAsync();
+        await browser.EvaluateAsync("""
+            const {relayFetch} = await import('./relay-fetch.js');
+            const relay = {endpoint: 'https://relay.example/relay', token: 'private-relay-token-123456789'};
+            const request = 'https://target.example/private?key=secret-query';
+            let calls = 0;
+            const fail = async (body, type = 'text/plain') => {
+                try {
+                    await relayFetch(async () => { calls++; return new Response(body, {status: 502, headers: {'content-type': type}}); }, relay, request,
+                        {headers: {Authorization: 'Bearer target-secret'}, credentials: 'omit'});
+                    throw Error('Expected rejection');
+                } catch (error) { return error.message; }
+            };
+            const text = await fail(`Tor connection failed: DNS lookup failed ${relay.token} Bearer target-secret ${request} secret-query`);
+            if (!text.includes('DNS lookup failed') || !text.includes('502') || !text.includes('No direct fallback')) throw Error(text);
+            for (const secret of [relay.token, 'target-secret', 'secret-query', '/private']) if (text.includes(secret)) throw Error('Secret leaked');
+            const json = await fail(JSON.stringify({error: 'TLS handshake failed'}), 'application/json');
+            if (!json.includes('TLS handshake failed')) throw Error(json);
+            const html = await fail('<html>private page</html>', 'text/html');
+            if (html.includes('private page')) throw Error('HTML leaked');
+            let cancelled = false;
+            const large = await fail(new ReadableStream({pull(c) { c.enqueue(new TextEncoder().encode('x'.repeat(8192))); }, cancel() { cancelled = true; }}));
+            if (!cancelled || large.length > 1300 || !large.includes('truncated')) throw Error('Unbounded error response');
+            if (calls !== 4) throw Error('Unexpected retry or fallback');
+            const target = await relayFetch(async () => new Response(JSON.stringify({status:403,headers:{},bodyBase64:btoa('denied')})), relay, request);
+            if (target.status !== 403 || await target.text() !== 'denied') throw Error('Target rejection was replaced');
+            """);
+    }
+    [Fact]
     public async Task RelayEnforcesOriginsTokensTargetsAndBoundsWhilePreservingMethodsBodiesAndErrors()
     {
         await using var target = await Target(); await using var relay = await Relay(Page, Origin(target)); using var http = new HttpClient();
